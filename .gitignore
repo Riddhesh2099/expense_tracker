@@ -1,0 +1,12 @@
+node_modules
+dist
+tools
+.env
+.env.local
+.secrets
+firebase-service-account.json
+.firebase
+firebase-debug.log
+*.tsbuildinfo
+.gcloud
+.config
