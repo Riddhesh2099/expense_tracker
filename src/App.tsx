@@ -17,6 +17,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -355,8 +356,20 @@ function AuthScreen() {
 
   useEffect(() => {
     if (!auth) return;
-    getRedirectResult(auth).catch((caught) => {
-      setError(caught instanceof Error ? caught.message : "Google sign-in failed.");
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) setBusy(false);
+      })
+      .catch((caught) => {
+        setBusy(false);
+        setError(authErrorMessage(caught, "Google sign-in failed."));
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, (nextUser) => {
+      if (nextUser) setBusy(false);
     });
   }, []);
 
@@ -372,7 +385,7 @@ function AuthScreen() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Authentication failed.");
+      setError(authErrorMessage(caught, "Authentication failed."));
     } finally {
       setBusy(false);
     }
@@ -385,9 +398,19 @@ function AuthScreen() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithRedirect(auth, provider);
+      try {
+        await signInWithPopup(auth, provider);
+        setBusy(false);
+      } catch (caught) {
+        if (shouldUseRedirectFallback(caught)) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        setError(authErrorMessage(caught, "Google sign-in failed."));
+        setBusy(false);
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Google sign-in failed.");
+      setError(authErrorMessage(caught, "Google sign-in failed."));
       setBusy(false);
     }
   }
@@ -420,6 +443,27 @@ function AuthScreen() {
       </form>
     </main>
   );
+}
+
+function authErrorMessage(caught: unknown, fallback: string) {
+  if (!(caught instanceof Error)) return fallback;
+  const code = "code" in caught ? String(caught.code) : "";
+  if (code.includes("unauthorized-domain")) {
+    return "This website domain is not authorized in Firebase Authentication settings.";
+  }
+  if (code.includes("operation-not-allowed")) {
+    return "Google sign-in is not enabled in Firebase Authentication.";
+  }
+  if (code.includes("popup-closed-by-user")) {
+    return "The Google sign-in window was closed before finishing.";
+  }
+  return caught.message || fallback;
+}
+
+function shouldUseRedirectFallback(caught: unknown) {
+  if (!(caught instanceof Error) || !("code" in caught)) return false;
+  const code = String(caught.code);
+  return code.includes("popup-blocked") || code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request");
 }
 
 function ExpenseForm({ userId, categories }: { userId: string; categories: Category[] }) {
