@@ -89,13 +89,14 @@ After that, sign-up and sign-in from the deployed app will work.
 ## GitHub Deployment
 
 This repository includes a GitHub Actions workflow at `.github/workflows/firebase-hosting.yml`.
-When pushed to `main`, it can lint, build, and deploy Firebase Hosting plus Firestore rules/indexes.
+Pull requests run lint and build. Pushes to `main`/`master` also deploy Firebase Hosting plus
+Firestore rules/indexes. The deploy project id comes from `.firebaserc` — no project secret needed.
 
-Add these repository secrets in GitHub before relying on automatic deploys:
+Add these repository secrets in GitHub before relying on automatic deploys
+(the workflow fails with an explicit message if any are missing):
 
 ```text
-FIREBASE_PROJECT_ID=project-dc59a57a-442b-4b6a-a3f
-FIREBASE_SERVICE_ACCOUNT_JSON=<full service account JSON>
+FIREBASE_SERVICE_ACCOUNT_JSON=<full service account JSON, from Project settings > Service accounts > Generate new private key>
 VITE_FIREBASE_API_KEY=<Firebase web API key>
 VITE_FIREBASE_AUTH_DOMAIN=project-dc59a57a-442b-4b6a-a3f.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=project-dc59a57a-442b-4b6a-a3f
