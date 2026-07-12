@@ -454,16 +454,23 @@ function authErrorMessage(caught: unknown, fallback: string) {
   if (code.includes("operation-not-allowed")) {
     return "Google sign-in is not enabled in Firebase Authentication.";
   }
-  if (code.includes("popup-closed-by-user")) {
+  if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) {
     return "The Google sign-in window was closed before finishing.";
+  }
+  if (code.includes("popup-blocked")) {
+    return "Your browser blocked the Google sign-in window. Allow popups for this site and try again.";
   }
   return caught.message || fallback;
 }
 
 function shouldUseRedirectFallback(caught: unknown) {
   if (!(caught instanceof Error) || !("code" in caught)) return false;
-  const code = String(caught.code);
-  return code.includes("popup-blocked") || code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request");
+  if (!String(caught.code).includes("popup-blocked")) return false;
+  // signInWithRedirect only completes reliably when the app is served from the
+  // Firebase authDomain; on any other origin modern browsers block the
+  // third-party storage it needs and the redirect returns with no user.
+  const authDomain = String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "");
+  return authDomain !== "" && window.location.hostname === authDomain;
 }
 
 function ExpenseForm({ userId, categories }: { userId: string; categories: Category[] }) {
