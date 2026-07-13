@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   createUserWithEmailAndPassword,
@@ -83,7 +84,9 @@ function formatMoney(amount: number, currency = "USD") {
 }
 
 function formatInputDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  // toISOString would shift to UTC and show yesterday's date for
+  // timezones ahead of UTC in the early morning.
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
 export function App() {
@@ -111,17 +114,21 @@ export function App() {
     const categoryQuery = query(collection(firestore, "users", user.uid, "categories"), orderBy("name"));
     const expenseQuery = query(collection(firestore, "users", user.uid, "expenses"), orderBy("expenseDate", "desc"));
 
+    let seededDefaults = false;
+
     const unsubscribeCategories = onSnapshot(categoryQuery, async (snapshot) => {
       if (snapshot.empty) {
-        await Promise.all(
-          defaultCategories.map(([name, color]) =>
-            addDoc(collection(firestore, "users", user.uid, "categories"), {
-              name,
-              color,
-              createdAt: serverTimestamp(),
-            }),
-          ),
-        );
+        if (seededDefaults) return;
+        seededDefaults = true;
+        const batch = writeBatch(firestore);
+        defaultCategories.forEach(([name, color]) => {
+          batch.set(doc(collection(firestore, "users", user.uid, "categories")), {
+            name,
+            color,
+            createdAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
         return;
       }
 
@@ -482,6 +489,7 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
   const [expenseDate, setExpenseDate] = useState(formatInputDate(new Date()));
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!categoryId && categories[0]) setCategoryId(categories[0].id);
@@ -490,23 +498,34 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!db || !categoryId) return;
+    const parsedAmount = Number(amount.trim());
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError("Enter a valid amount greater than zero, like 12.50.");
+      return;
+    }
     setBusy(true);
-    await addDoc(collection(db, "users", userId, "expenses"), {
-      title,
-      merchant,
-      amount: Number(amount),
-      currency: "USD",
-      categoryId,
-      paymentMethod,
-      notes,
-      expenseDate: Timestamp.fromDate(new Date(`${expenseDate}T12:00:00`)),
-      createdAt: serverTimestamp(),
-    });
-    setTitle("");
-    setMerchant("");
-    setAmount("");
-    setNotes("");
-    setBusy(false);
+    setError("");
+    try {
+      await addDoc(collection(db, "users", userId, "expenses"), {
+        title,
+        merchant,
+        amount: parsedAmount,
+        currency: "USD",
+        categoryId,
+        paymentMethod,
+        notes,
+        expenseDate: Timestamp.fromDate(new Date(`${expenseDate}T12:00:00`)),
+        createdAt: serverTimestamp(),
+      });
+      setTitle("");
+      setMerchant("");
+      setAmount("");
+      setNotes("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save the expense.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -536,6 +555,7 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
         </select>
       </div>
       <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes" rows={3} />
+      {error && <p className="error">{error}</p>}
       <button disabled={busy || !categories.length}>
         <Check size={18} />
         Save expense
@@ -547,16 +567,22 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
 function CategoryManager({ userId, categories }: { userId: string; categories: Category[] }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#2563eb");
+  const [error, setError] = useState("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!db) return;
-    await addDoc(collection(db, "users", userId, "categories"), {
-      name,
-      color,
-      createdAt: serverTimestamp(),
-    });
-    setName("");
+    setError("");
+    try {
+      await addDoc(collection(db, "users", userId, "categories"), {
+        name,
+        color,
+        createdAt: serverTimestamp(),
+      });
+      setName("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not add the category.");
+    }
   }
 
   return (
@@ -570,6 +596,7 @@ function CategoryManager({ userId, categories }: { userId: string; categories: C
         <input className="color-input" type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label="Category color" />
         <button>Add</button>
       </form>
+      {error && <p className="error">{error}</p>}
       <div className="chips">
         {categories.map((category) => (
           <span className="chip" key={category.id}>
@@ -591,9 +618,10 @@ function ExpenseList({
   categories: Map<string, Category>;
   userId: string;
 }) {
-  async function removeExpense(expenseId: string) {
+  async function removeExpense(expense: Expense) {
     if (!db) return;
-    await deleteDoc(doc(db, "users", userId, "expenses", expenseId));
+    if (!window.confirm(`Delete "${expense.title}"? This cannot be undone.`)) return;
+    await deleteDoc(doc(db, "users", userId, "expenses", expense.id));
   }
 
   async function changeCategory(expenseId: string, categoryId: string) {
@@ -628,7 +656,7 @@ function ExpenseList({
                   {category?.name ?? "Uncategorized"}
                 </span>
                 <strong>{formatMoney(expense.amount, expense.currency)}</strong>
-                <button className="icon-only" onClick={() => removeExpense(expense.id)} aria-label={`Delete ${expense.title}`}>
+                <button className="icon-only" onClick={() => removeExpense(expense)} aria-label={`Delete ${expense.title}`}>
                   <Trash2 size={18} />
                 </button>
               </article>
