@@ -64,9 +64,9 @@ const defaultCategories = [
   ["Other", "#64748b"],
 ] as const;
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
-  currency: "USD",
+  currency: "INR",
 });
 
 function toDate(value: unknown) {
@@ -75,12 +75,8 @@ function toDate(value: unknown) {
   return new Date();
 }
 
-function formatMoney(amount: number, currency = "USD") {
-  try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
-  } catch {
-    return currencyFormatter.format(amount);
-  }
+function formatMoney(amount: number) {
+  return currencyFormatter.format(amount);
 }
 
 function formatInputDate(date: Date) {
@@ -151,7 +147,7 @@ export function App() {
             title: data.title,
             merchant: data.merchant ?? "",
             amount: Number(data.amount ?? 0),
-            currency: data.currency ?? "USD",
+            currency: data.currency ?? "INR",
             categoryId: data.categoryId,
             paymentMethod: data.paymentMethod ?? "",
             notes: data.notes ?? "",
@@ -303,15 +299,19 @@ export function App() {
 
       <section className="charts">
         <ChartPanel title="Monthly trend">
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={monthlyChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(value) => formatMoney(Number(value))} />
-              <Line type="monotone" dataKey="amount" stroke="#2563eb" strokeWidth={3} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          {monthlyChart.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={monthlyChart}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Line type="monotone" dataKey="amount" stroke="#2563eb" strokeWidth={3} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState text="Add an expense to see your monthly trend." />
+          )}
         </ChartPanel>
 
         <ChartPanel title="By category">
@@ -510,7 +510,7 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
         title,
         merchant,
         amount: parsedAmount,
-        currency: "USD",
+        currency: "INR",
         categoryId,
         paymentMethod,
         notes,
@@ -537,7 +537,7 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
       <div className="field-grid">
         <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" required />
         <input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder="Merchant" />
-        <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Amount" inputMode="decimal" required />
+        <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Amount (₹)" inputMode="decimal" required />
         <input type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} required />
         <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required>
           {categories.map((category) => (
@@ -655,7 +655,7 @@ function ExpenseList({
                 <span className="category-pill" style={{ borderColor: category?.color }}>
                   {category?.name ?? "Uncategorized"}
                 </span>
-                <strong>{formatMoney(expense.amount, expense.currency)}</strong>
+                <strong>{formatMoney(expense.amount)}</strong>
                 <button className="icon-only" onClick={() => removeExpense(expense)} aria-label={`Delete ${expense.title}`}>
                   <Trash2 size={18} />
                 </button>
