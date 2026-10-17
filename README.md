@@ -15,6 +15,19 @@ Live at **https://expenses.ridventure.com** (Cloudflare DNS → Firebase Hosting
 - Monthly trend and category charts
 - Firestore security rules scoped to each authenticated user
 
+## ridv CLI (terminal / AI agents)
+
+```bash
+npm link                     # once, from this repo: puts `ridv` on your PATH (Node >= 24.2)
+ridv login                   # opens the browser; sign in, type the code shown, click Authorize
+ridv add 450 Lunch -m Truffles -d yesterday -p upi -c food
+ridv list                    # recent expenses + this month's total
+ridv delete <id>             # undo
+```
+
+`ridv` acts as the signed-in user under the same Firestore rules as the website; the session lives in
+`~/.config/ridv/credentials.json` (owner-only). See AGENTS.md for how AI agents should use it.
+
 ## Local Setup
 
 1. Install dependencies:
