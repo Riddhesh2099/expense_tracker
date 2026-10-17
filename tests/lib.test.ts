@@ -46,6 +46,13 @@ test("budgetStatus counts only this month and only budgeted categories", () => {
 
 test("expensesToCsv escapes commas, quotes and newlines", () => {
   const csv = expensesToCsv([expense({ title: 'Dinner, "fancy"', notes: "two\nlines" })], () => "Food");
-  const [, row] = csv.split("\r\n");
+  const [header, row] = csv.split("\r\n");
+  assert.ok(header.startsWith("﻿Date,"), "starts with a UTF-8 BOM for Excel");
   assert.equal(row, '2026-10-10,"Dinner, ""fancy""",,Food,UPI,100,"two\nlines"');
+});
+
+test("expensesToCsv defuses spreadsheet formulas in text but not in amounts", () => {
+  const csv = expensesToCsv([expense({ title: "=HYPERLINK(1)", merchant: "@x", amount: -5 })], () => "Food");
+  const [, row] = csv.split("\r\n");
+  assert.equal(row, "2026-10-10,'=HYPERLINK(1),'@x,Food,UPI,-5,");
 });

@@ -92,8 +92,8 @@ After that, sign-up and sign-in from the deployed app will work.
 ## GitHub Deployment
 
 This repository includes a GitHub Actions workflow at `.github/workflows/firebase-hosting.yml`.
-Pull requests run lint, tests, build and a `firebase deploy --dry-run`. Pushes to `main`/`master`
-deploy Firebase Hosting plus Firestore rules/indexes.
+Pull requests run lint, tests, build and a `firebase deploy --dry-run`. Pushes to `main`
+deploy Firebase Hosting plus Firestore rules/indexes (deploys are serialized; other branches never deploy).
 
 **No repository secrets are needed.** The workflow authenticates with Workload Identity Federation:
 GitHub's OIDC token is exchanged for short-lived credentials of the

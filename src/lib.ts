@@ -52,7 +52,8 @@ export function budgetStatus(categories: Category[], expenses: Expense[], now = 
 }
 
 function csvCell(value: string | number) {
-  const text = String(value);
+  // Text starting with = + - @ is run as a formula by Excel/Sheets; a leading ' keeps it literal.
+  const text = typeof value === "string" && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value);
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -67,5 +68,6 @@ export function expensesToCsv(expenses: Expense[], categoryName: (id: string) =>
     expense.amount,
     expense.notes,
   ]);
-  return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+  // BOM so Excel reads UTF-8 (₹, non-ASCII titles) instead of the local ANSI code page.
+  return "﻿" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
 }

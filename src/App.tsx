@@ -82,7 +82,7 @@ function downloadCsv(expenses: Expense[], categories: Map<string, Category>) {
   link.href = url;
   link.download = `expenses-${formatInputDate(new Date())}.csv`;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0); // revoking synchronously is flaky in Safari
 }
 
 export function App() {
@@ -92,7 +92,7 @@ export function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("month");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [pickedCategoryFilter, setCategoryFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date-desc");
   const [editing, setEditing] = useState<Expense | null>(null);
 
@@ -170,6 +170,9 @@ export function App() {
     () => new Map(categories.map((category) => [category.id, category])),
     [categories],
   );
+
+  // A filter on a since-deleted category silently hides everything; treat it as "all".
+  const categoryFilter = categoryById.has(pickedCategoryFilter) ? pickedCategoryFilter : "all";
 
   const filteredExpenses = useMemo(() => {
     const now = new Date();
@@ -312,6 +315,7 @@ export function App() {
           className="ghost"
           onClick={() => downloadCsv(filteredExpenses, categoryById)}
           disabled={!filteredExpenses.length}
+          title="Export the expenses currently shown (respects filters)"
         >
           <Download size={18} />
           CSV
@@ -528,16 +532,14 @@ function ExpenseForm({
   const [title, setTitle] = useState(editing?.title ?? "");
   const [merchant, setMerchant] = useState(editing?.merchant ?? "");
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
-  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? "");
+  const [pickedCategoryId, setPickedCategoryId] = useState(editing?.categoryId ?? "");
   const [paymentMethod, setPaymentMethod] = useState(editing?.paymentMethod || "Card");
   const [expenseDate, setExpenseDate] = useState(formatInputDate(editing?.expenseDate ?? new Date()));
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!categoryId && categories[0]) setCategoryId(categories[0].id);
-  }, [categories, categoryId]);
+  // Derived, not stored: if the picked category is deleted meanwhile, fall back to what the select shows.
+  const categoryId = categories.some((c) => c.id === pickedCategoryId) ? pickedCategoryId : (categories[0]?.id ?? "");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -588,7 +590,7 @@ function ExpenseForm({
         <input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder="Merchant" />
         <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Amount (₹)" inputMode="decimal" required />
         <input type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} required />
-        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required>
+        <select value={categoryId} onChange={(event) => setPickedCategoryId(event.target.value)} required>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}

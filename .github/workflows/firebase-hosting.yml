@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
   workflow_dispatch:
+
+# Never run two production deploys at once; queue instead of cancelling.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'deploy' }}
+  cancel-in-progress: false
 
 # Keyless auth: GitHub's OIDC token is exchanged for short-lived Google credentials via
 # Workload Identity Federation. No service-account key and no repository secrets needed.
@@ -60,5 +64,6 @@ jobs:
         run: npx firebase deploy --only hosting,firestore --dry-run --non-interactive
 
       - name: Deploy hosting and Firestore config
-        if: github.event_name != 'pull_request'
+        # main only: a manual dispatch on a feature branch must not deploy it to production.
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: npx firebase deploy --only hosting,firestore --non-interactive
