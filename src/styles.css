@@ -112,6 +112,14 @@ h2 {
   color: #0f172a;
 }
 
+a.link-button {
+  border-radius: 8px;
+  font-weight: 700;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
 .google-button {
   background: white;
   border: 1px solid #cbd5e1;

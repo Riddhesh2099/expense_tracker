@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   writeBatch,
@@ -232,6 +233,10 @@ export function App() {
 
   if (!user) {
     return <AuthScreen />;
+  }
+
+  if (window.location.pathname.replace(/\/+$/, "") === "/cli-login") {
+    return <CliLogin user={user} />;
   }
 
   return (
@@ -829,6 +834,78 @@ function ChartPanel({ title, children }: { title: string; children: ReactNode })
 
 function EmptyState({ text }: { text: string }) {
   return <p className="empty">{text}</p>;
+}
+
+/**
+ * `ridv login` handoff. The CLI generated a random code and polls cliLogins/{code}; authorizing writes this
+ * browser's Firebase refresh token there. The CLI reads it once and deletes it; leftovers expire via TTL.
+ */
+function CliLogin({ user }: { user: User }) {
+  const code = new URLSearchParams(window.location.search).get("code") ?? "";
+  const valid = /^[0-9a-f]{48}$/.test(code);
+  const verification = `${code.slice(-8, -4)}-${code.slice(-4)}`.toUpperCase();
+  const [typed, setTyped] = useState("");
+  // Typing the code from your own terminal is what stops a phishing link (someone else's code) from working.
+  const matches = typed.replace(/[^0-9a-f]/gi, "").toUpperCase() === verification.replace("-", "");
+  const [status, setStatus] = useState<"ask" | "busy" | "done">("ask");
+  const [error, setError] = useState("");
+
+  async function authorize() {
+    if (!db || !matches) return;
+    setStatus("busy");
+    setError("");
+    try {
+      await setDoc(doc(db, "cliLogins", code), {
+        uid: user.uid,
+        email: user.email ?? "",
+        refreshToken: user.refreshToken,
+        expireAt: Timestamp.fromMillis(Date.now() + 10 * 60_000),
+      });
+      setStatus("done");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not authorize the CLI.");
+      setStatus("ask");
+    }
+  }
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-panel">
+        <h1>Authorize ridv</h1>
+        {!valid ? (
+          <p className="error">This link is missing a valid login code. Run `ridv login` again.</p>
+        ) : status === "done" ? (
+          <p>Done. Return to your terminal; you can close this tab.</p>
+        ) : (
+          <>
+            <p>
+              Allow the <strong>ridv</strong> command-line tool to add and read expenses as <strong>{user.email}</strong>.
+            </p>
+            <p>
+              Type the code shown in <strong>your own</strong> terminal after running <code>ridv login</code>. If someone
+              sent you this link, close this tab.
+            </p>
+            <input
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              placeholder="XXXX-XXXX"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Code from your terminal"
+            />
+            {error && <p className="error">{error}</p>}
+            <button onClick={authorize} disabled={status === "busy" || !matches}>
+              <Check size={18} />
+              Authorize this computer
+            </button>
+            <a className="link-button" href="/">
+              Cancel
+            </a>
+          </>
+        )}
+      </section>
+    </main>
+  );
 }
 
 function ConfigMissing({ missing }: { missing: string[] }) {

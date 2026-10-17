@@ -10,6 +10,26 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    // `ridv login` handoff slots, keyed by a random 32+ char code only the CLI and the browser know.
+    // Create-only, own uid only, expiring within 15 min; anyone holding the code may read it until it
+    // expires, and delete it (no listing). The CLI deletes it after reading. TTL policies need billing,
+    // so instead an expired slot simply becomes unreadable.
+    match /cliLogins/{code} {
+      allow create: if signedIn()
+        && code.matches('^[0-9a-f]{48}$')
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'refreshToken', 'expireAt'])
+        && request.resource.data.keys().hasAll(['uid', 'email', 'refreshToken', 'expireAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.refreshToken is string
+        && request.resource.data.refreshToken.size() < 2048
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt <= request.time + duration.value(15, 'm');
+      // resource == null: a not-yet-created slot must read as 404 (the CLI polls for it), not 403.
+      allow get: if resource == null || resource.data.expireAt > request.time;
+      allow delete: if true;
+    }
+
     match /users/{userId} {
       allow read, write: if ownsUserDoc(userId);
 
