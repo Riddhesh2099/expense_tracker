@@ -4,9 +4,28 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
   workflow_dispatch:
+
+# Never run two production deploys at once; queue instead of cancelling.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'deploy' }}
+  cancel-in-progress: false
+
+# Keyless auth: GitHub's OIDC token is exchanged for short-lived Google credentials via
+# Workload Identity Federation. No service-account key and no repository secrets needed.
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # Firebase web config is public by design (it ships in every page load), so it lives here.
+  VITE_FIREBASE_API_KEY: AIzaSyAaGPkRzftcI83LmQosIkjHFKofGALxLvo
+  VITE_FIREBASE_AUTH_DOMAIN: project-dc59a57a-442b-4b6a-a3f.firebaseapp.com
+  VITE_FIREBASE_PROJECT_ID: project-dc59a57a-442b-4b6a-a3f
+  VITE_FIREBASE_STORAGE_BUCKET: project-dc59a57a-442b-4b6a-a3f.firebasestorage.app
+  VITE_FIREBASE_MESSAGING_SENDER_ID: "767682202840"
+  VITE_FIREBASE_APP_ID: 1:767682202840:web:678481c0d30cb04e5ddbad
 
 jobs:
   deploy:
@@ -25,58 +44,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create environment file
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-        run: |
-          cat > .env <<EOF
-          VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
-          VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
-          VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
-          VITE_FIREBASE_STORAGE_BUCKET=$VITE_FIREBASE_STORAGE_BUCKET
-          VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID
-          VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
-          EOF
-
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build
 
-      - name: Validate deploy secrets
-        if: github.event_name != 'pull_request'
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          fail=0
-          if [ -z "$VITE_FIREBASE_API_KEY" ]; then
-            echo "::error::VITE_FIREBASE_* secrets are not set - the deployed site would show the config-missing screen. Add them under Settings > Secrets and variables > Actions."
-            fail=1
-          fi
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "::error::FIREBASE_SERVICE_ACCOUNT_JSON secret is not set. Generate a key in Firebase console (Project settings > Service accounts > Generate new private key) and add the full JSON as a repository secret."
-            fail=1
-          fi
-          exit $fail
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/767682202840/locations/global/workloadIdentityPools/github/providers/expense-tracker
+          service_account: github-deployer@project-dc59a57a-442b-4b6a-a3f.iam.gserviceaccount.com
 
-      - name: Write Firebase service account
-        if: github.event_name != 'pull_request'
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
-          node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RUNNER_TEMP/firebase-service-account.json" \
-            || { echo "::error::FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON."; exit 1; }
+      - name: Validate deploy (pull requests)
+        if: github.event_name == 'pull_request'
+        run: npx firebase deploy --only hosting,firestore --dry-run --non-interactive
 
       - name: Deploy hosting and Firestore config
-        if: github.event_name != 'pull_request'
+        # main only: a manual dispatch on a feature branch must not deploy it to production.
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: npx firebase deploy --only hosting,firestore --non-interactive
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json

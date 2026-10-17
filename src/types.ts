@@ -2,6 +2,8 @@ export type Category = {
   id: string;
   name: string;
   color: string;
+  /** Monthly budget in INR; 0 or missing means no budget. */
+  budget?: number;
   createdAt: Date;
 };
 

@@ -4,13 +4,15 @@ A mobile-first expense tracker backed by Firebase Authentication and Cloud Fires
 
 ## Features
 
-- Email/password sign up and sign in
-- Add expenses from mobile or desktop
-- Manage categories
-- Filter by search, date range, and category
-- Sort by date, amount, or title
-- Monthly and category charts
-- Firebase Hosting deployment config
+Live at **https://expenses.ridventure.com** (Cloudflare DNS → Firebase Hosting).
+
+- Email/password or Google sign in
+- Add, edit and delete expenses (amounts in ₹) from mobile or desktop
+- Categories: add, rename, delete (its expenses move to "Other"), and an optional monthly budget each
+- "Budgets this month" progress bars, red when a category goes over
+- Filter by search, date range, and category; sort by date, amount, or title
+- Export the filtered list as CSV
+- Monthly trend and category charts
 - Firestore security rules scoped to each authenticated user
 
 ## Local Setup
@@ -71,6 +73,7 @@ The deploy publishes:
 
 Current deployed v1:
 
+- Custom domain: https://expenses.ridventure.com (also listed under Authentication > Settings > Authorized domains)
 - Hosting URL: https://project-dc59a57a-442b-4b6a-a3f.web.app
 - Firebase Console: https://console.firebase.google.com/project/project-dc59a57a-442b-4b6a-a3f/overview
 
@@ -89,23 +92,19 @@ After that, sign-up and sign-in from the deployed app will work.
 ## GitHub Deployment
 
 This repository includes a GitHub Actions workflow at `.github/workflows/firebase-hosting.yml`.
-Pull requests run lint and build. Pushes to `main`/`master` also deploy Firebase Hosting plus
-Firestore rules/indexes. The deploy project id comes from `.firebaserc` — no project secret needed.
+Pull requests run lint, tests, build and a `firebase deploy --dry-run`. Pushes to `main`
+deploy Firebase Hosting plus Firestore rules/indexes (deploys are serialized; other branches never deploy).
 
-Add these repository secrets in GitHub before relying on automatic deploys
-(the workflow fails with an explicit message if any are missing):
+**No repository secrets are needed.** The workflow authenticates with Workload Identity Federation:
+GitHub's OIDC token is exchanged for short-lived credentials of the
+`github-deployer@project-dc59a57a-442b-4b6a-a3f.iam.gserviceaccount.com` service account
+(roles: Hosting admin, Rules admin, Datastore index admin, Firebase viewer, Service usage consumer).
+The pool `github` / provider `expense-tracker` only accepts tokens from `Riddhesh2099/expense_tracker`.
+The Firebase web config (`VITE_FIREBASE_*`) is public by design and is set in the workflow `env`.
 
-```text
-FIREBASE_SERVICE_ACCOUNT_JSON=<full service account JSON, from Project settings > Service accounts > Generate new private key>
-VITE_FIREBASE_API_KEY=<Firebase web API key>
-VITE_FIREBASE_AUTH_DOMAIN=project-dc59a57a-442b-4b6a-a3f.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=project-dc59a57a-442b-4b6a-a3f
-VITE_FIREBASE_STORAGE_BUCKET=project-dc59a57a-442b-4b6a-a3f.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=767682202840
-VITE_FIREBASE_APP_ID=1:767682202840:web:678481c0d30cb04e5ddbad
-```
+Keep your local `.env` out of git; it is ignored intentionally.
 
-Keep local copies of `.env` and `.secrets/firebase-service-account.json` out of git. They are ignored intentionally.
+Run the unit tests with `npm test` (Node's built-in runner; needs Node 22.18+ for TypeScript).
 
 ## Cost Notes
 
