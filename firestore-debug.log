@@ -2,7 +2,7 @@ WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/Users/riddhesh/.cache/firebase/emulators/cloud-firestore-emulator-v1.21.0.jar)
 WARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2
 WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
-Oct 18, 2026 1:35:35 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
+Oct 18, 2026 1:51:13 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
 INFO: Started WebSocket server on ws://127.0.0.1:9150
 
 API endpoint: http://127.0.0.1:8080
@@ -20,15 +20,15 @@ If you are running a Firestore in Datastore Mode project, run:
 Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
 Dev App Server is now running.
 
-Oct 18, 2026 1:35:35 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+Oct 18, 2026 1:51:13 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected non-HTTP/2 connection.
-Oct 18, 2026 1:35:36 AM io.grpc.netty.TcpMetrics loadEpollInfo
+Oct 18, 2026 1:51:13 AM io.grpc.netty.TcpMetrics loadEpollInfo
 INFO: Epoll available during static init of TcpMetrics:false
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+Oct 18, 2026 1:51:13 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected HTTP/2 connection.
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected non-HTTP/2 connection.
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -63,10 +63,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -101,10 +101,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -139,10 +139,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -177,10 +177,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -215,10 +215,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -253,10 +253,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -291,10 +291,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -329,10 +329,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -367,10 +367,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/6e6f742d7965740000000000000000000000000000000000) not found.
 com.google.cloud.datastore.core.exception.DatastoreException: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/6e6f742d7965740000000000000000000000000000000000) not found.
 	at com.google.cloud.datastore.emulator.impl.firestore.CloudFirestoreV1.getDocument(CloudFirestoreV1.java:329)
@@ -397,9 +397,9 @@ com.google.cloud.datastore.core.exception.DatastoreException: Document (projects
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: NOT_FOUND: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/6e6f742d7965740000000000000000000000000000000000) not found.
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: No matching allow statements
 com.google.cloud.datastore.core.exception.DatastoreException: No matching allow statements
 	at com.google.cloud.datastore.core.exception.DatastoreException$Builder.build(DatastoreException.java:152)
@@ -435,9 +435,9 @@ com.google.cloud.datastore.core.exception.DatastoreException: No matching allow 
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: No matching allow statements
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L18
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -472,10 +472,10 @@ false for 'create' @ L18
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L18
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: entity already exists: EntityRef[partitionRef=dev~demo-ridv, path=/cliLogins/726561640000000000000000000000000000000000000000]
 com.google.cloud.datastore.core.exception.DatastoreException: entity already exists: EntityRef[partitionRef=dev~demo-ridv, path=/cliLogins/726561640000000000000000000000000000000000000000]
 	at com.google.cloud.datastore.core.exception.DatastoreException.withProblem(DatastoreException.java:352)
@@ -507,9 +507,9 @@ com.google.cloud.datastore.core.exception.DatastoreException: entity already exi
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: ALREADY_EXISTS: entity already exists: EntityRef[partitionRef=dev~demo-ridv, path=/cliLogins/726561640000000000000000000000000000000000000000]
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 evaluation error at L29:21 for 'get' @ L29, false for 'get' @ L29
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -546,10 +546,10 @@ evaluation error at L29:21 for 'get' @ L29, false for 'get' @ L29
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 evaluation error at L29:21 for 'get' @ L29, false for 'get' @ L29
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/726561640000000000000000000000000000000000000000) not found.
 com.google.cloud.datastore.core.exception.DatastoreException: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/726561640000000000000000000000000000000000000000) not found.
 	at com.google.cloud.datastore.emulator.impl.firestore.CloudFirestoreV1.getDocument(CloudFirestoreV1.java:329)
@@ -576,9 +576,9 @@ com.google.cloud.datastore.core.exception.DatastoreException: Document (projects
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: NOT_FOUND: Document (projects/demo-ridv/databases/(default)/documents/cliLogins/726561640000000000000000000000000000000000000000) not found.
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'get' @ L41
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -615,10 +615,10 @@ false for 'get' @ L41
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'get' @ L41
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'get' @ L41
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -655,10 +655,10 @@ false for 'get' @ L41
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'get' @ L41
-Oct 18, 2026 1:35:36 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
+Oct 18, 2026 1:51:14 AM com.google.cloud.datastore.emulator.impl.util.WrappedStreamObserver onError
 WARNING: Operation failed: 
 false for 'create' @ L41
 com.google.cloud.datastore.core.exception.DatastoreException: 
@@ -693,7 +693,7 @@ false for 'create' @ L41
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
 	at java.base/java.lang.Thread.run(Thread.java:1527)
 
-Oct 18, 2026 1:35:36 AM io.gapi.emulators.netty.HttpHandler$1 onError
+Oct 18, 2026 1:51:14 AM io.gapi.emulators.netty.HttpHandler$1 onError
 INFO: Exception when handling request: PERMISSION_DENIED: 
 false for 'create' @ L41
 *** shutting down gRPC server since JVM is shutting down

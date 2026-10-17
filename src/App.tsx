@@ -228,22 +228,29 @@ export function App() {
   }
 
   if (!authReady) {
-    return <div className="centered">Loading your tracker...</div>;
+    return <div className="centered">Loading...</div>;
   }
 
   if (!user) {
     return <AuthScreen />;
   }
 
-  if (window.location.pathname.replace(/\/+$/, "") === "/cli-login") {
+  // ponytail: pathname switch + plain links (full reload); a router earns its place once sections share state.
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path === "/cli-login") {
     return <CliLogin user={user} />;
+  }
+  if (path !== "/expenses") {
+    return <Hub user={user} monthTotal={monthTotal} />;
   }
 
   return (
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Cloud Expense Tracker</p>
+          <a className="eyebrow" href="/">
+            ← Ridventure
+          </a>
           <h1>Expenses</h1>
         </div>
         <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
@@ -468,8 +475,8 @@ function AuthScreen() {
     <main className="auth-screen">
       <form className="auth-panel" onSubmit={submit}>
         <BarChart3 size={32} />
-        <h1>Expense Tracker</h1>
-        <p>Sign in to record expenses and review spending from any phone or browser.</p>
+        <h1>Ridventure</h1>
+        <p>Your travel toolkit: expenses today, splitting and flights next. Sign in from any phone or browser.</p>
         <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />
         <input
           type="password"
@@ -834,6 +841,49 @@ function ChartPanel({ title, children }: { title: string; children: ReactNode })
 
 function EmptyState({ text }: { text: string }) {
   return <p className="empty">{text}</p>;
+}
+
+const HUB_APPS = [
+  { href: "/expenses", title: "Expenses", blurb: "Log spends in ₹, budgets per category, charts, CSV export.", ready: true },
+  { href: null, title: "Split", blurb: "Splitwise-style shared trip costs and settle-ups.", ready: false },
+  { href: null, title: "Flights", blurb: "Search flights and compare prices across sellers.", ready: false },
+];
+
+function Hub({ user, monthTotal }: { user: User; monthTotal: number }) {
+  return (
+    <main className="shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Ridventure</p>
+          <h1>Travel</h1>
+        </div>
+        <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
+          <LogOut size={18} />
+          Sign out
+        </button>
+      </header>
+      <p className="hub-intro">
+        Signed in as {user.email}. Everything here also works from the terminal or an AI agent via <code>ridv</code>.
+      </p>
+      <section className="hub-grid">
+        {HUB_APPS.map((app) =>
+          app.ready && app.href ? (
+            <a className="panel hub-card" href={app.href} key={app.title}>
+              <h2>{app.title}</h2>
+              <p>{app.blurb}</p>
+              {app.title === "Expenses" && <strong>{formatMoney(monthTotal)} this month</strong>}
+            </a>
+          ) : (
+            <div className="panel hub-card disabled" key={app.title}>
+              <h2>{app.title}</h2>
+              <p>{app.blurb}</p>
+              <span className="soon">Coming soon</span>
+            </div>
+          ),
+        )}
+      </section>
+    </main>
+  );
 }
 
 /**

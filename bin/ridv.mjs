@@ -19,6 +19,7 @@ const USAGE = `ridv — expense tracker CLI (expenses.ridventure.com)
 
   ridv login                  sign in via the browser (Google or email), once per computer
   ridv whoami | logout
+  Expense commands also work as \`ridv expense <command>\`.
   ridv add <amount> <title...> [-c category] [-m merchant] [-d date] [-p payment] [-n notes]
       date: today (default) | yesterday | YYYY-MM-DD | DD-MM-YYYY
       payment: ${PAYMENTS.join(" | ")} (default Card)
@@ -258,6 +259,8 @@ async function main() {
       help: { type: "boolean", short: "h" },
     },
   });
+  // `ridv expense add …` and `ridv add …` are the same; namespaces leave room for `ridv split …`, `ridv flights …`.
+  if (["expense", "expenses"].includes(positionals[0])) positionals.shift();
   const [command, ...args] = positionals;
   if (opts.help || !command) return console.log(USAGE);
   if (command === "login") return login();
