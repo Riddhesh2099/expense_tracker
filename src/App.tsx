@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   writeBatch,
@@ -232,6 +233,10 @@ export function App() {
 
   if (!user) {
     return <AuthScreen />;
+  }
+
+  if (window.location.pathname === "/cli-login") {
+    return <CliLogin user={user} />;
   }
 
   return (
@@ -829,6 +834,68 @@ function ChartPanel({ title, children }: { title: string; children: ReactNode })
 
 function EmptyState({ text }: { text: string }) {
   return <p className="empty">{text}</p>;
+}
+
+/**
+ * `ridv login` handoff. The CLI generated a random code and polls cliLogins/{code}; authorizing writes this
+ * browser's Firebase refresh token there. The CLI reads it once and deletes it; leftovers expire via TTL.
+ */
+function CliLogin({ user }: { user: User }) {
+  const code = new URLSearchParams(window.location.search).get("code") ?? "";
+  const valid = /^[A-Za-z0-9_-]{32,64}$/.test(code);
+  const verification = `${code.slice(-8, -4)}-${code.slice(-4)}`.toUpperCase();
+  const [status, setStatus] = useState<"ask" | "busy" | "done">("ask");
+  const [error, setError] = useState("");
+
+  async function authorize() {
+    if (!db) return;
+    setStatus("busy");
+    setError("");
+    try {
+      await setDoc(doc(db, "cliLogins", code), {
+        uid: user.uid,
+        email: user.email ?? "",
+        refreshToken: user.refreshToken,
+        createdAt: serverTimestamp(),
+        expireAt: Timestamp.fromMillis(Date.now() + 10 * 60_000),
+      });
+      setStatus("done");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not authorize the CLI.");
+      setStatus("ask");
+    }
+  }
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-panel">
+        <h1>Authorize ridv</h1>
+        {!valid ? (
+          <p className="error">This link is missing a valid login code. Run `ridv login` again.</p>
+        ) : status === "done" ? (
+          <p>Done. Return to your terminal; you can close this tab.</p>
+        ) : (
+          <>
+            <p>
+              Allow the <strong>ridv</strong> command-line tool to add and read expenses as <strong>{user.email}</strong>.
+            </p>
+            <p>
+              Only continue if you just ran <code>ridv login</code> yourself and your terminal shows the code:
+            </p>
+            <pre>{verification}</pre>
+            {error && <p className="error">{error}</p>}
+            <button onClick={authorize} disabled={status === "busy"}>
+              <Check size={18} />
+              Authorize this computer
+            </button>
+            <a className="link-button" href="/">
+              Cancel
+            </a>
+          </>
+        )}
+      </section>
+    </main>
+  );
 }
 
 function ConfigMissing({ missing }: { missing: string[] }) {
