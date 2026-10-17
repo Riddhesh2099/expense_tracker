@@ -4,7 +4,7 @@
 // runs as that user, under the same Firestore security rules as the website. Talks to Firestore REST directly.
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -40,7 +40,8 @@ export function parseDate(text = "today", now = new Date()) {
   let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   const [y, mo, d] = m ? [m[1], m[2], m[3]] : ((m = t.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)) ? [m[3], m[2], m[1]] : []);
   const date = y && new Date(Number(y), Number(mo) - 1, Number(d), 12);
-  if (!date || date.getDate() !== Number(d)) throw new Error(`Unrecognised date "${text}". Use today, yesterday, YYYY-MM-DD or DD-MM-YYYY.`);
+  // Round-trip check: rejects day *and* month overflow (2026-02-30, 2026-13-05 would otherwise roll over).
+  if (!date || date.getDate() !== Number(d) || date.getMonth() !== Number(mo) - 1) throw new Error(`Unrecognised date "${text}". Use today, yesterday, YYYY-MM-DD or DD-MM-YYYY.`);
   return date;
 }
 
@@ -99,7 +100,10 @@ async function request(url, init = {}, idToken) {
   });
   const body = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok) {
-    const error = new Error(`${init.method ?? "GET"} ${url.split("?")[0]} -> ${res.status}: ${body.error?.message ?? JSON.stringify(body)}`);
+    // Redact login codes: they are secrets and errors end up in agent transcripts.
+    const where = url.split("?")[0].replace(/cliLogins\/[^/]+/, "cliLogins/<code>");
+    const message = String(body.error?.message ?? JSON.stringify(body)).replace(/cliLogins\/[0-9a-f]+/g, "cliLogins/<code>");
+    const error = new Error(`${init.method ?? "GET"} ${where} -> ${res.status}: ${message}`);
     error.status = res.status;
     throw error;
   }
@@ -114,9 +118,15 @@ async function readCredentials() {
   }
 }
 
+/** Atomic write, owner-only even if the file/dir already existed with looser modes (mode only applies on create). */
 async function saveCredentials(credentials) {
-  await mkdir(join(CREDENTIALS, ".."), { recursive: true, mode: 0o700 });
-  await writeFile(CREDENTIALS, JSON.stringify(credentials, null, 2), { mode: 0o600 });
+  const dir = join(CREDENTIALS, "..");
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await chmod(dir, 0o700);
+  const tmp = `${CREDENTIALS}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify(credentials, null, 2), { mode: 0o600 });
+  await chmod(tmp, 0o600);
+  await rename(tmp, CREDENTIALS);
 }
 
 /** Exchange the stored refresh token for a fresh ID token (1h); persists the token if Google rotates it. */
@@ -134,7 +144,7 @@ async function getSession() {
     if (error.status === 400) throw new Error("Your ridv session expired or was revoked. Run `ridv login` again.");
     throw error;
   }
-  if (body.refresh_token !== credentials.refreshToken) await saveCredentials({ ...credentials, refreshToken: body.refresh_token });
+  if (body.refresh_token && body.refresh_token !== credentials.refreshToken) await saveCredentials({ ...credentials, refreshToken: body.refresh_token });
   session = { idToken: body.id_token, uid: body.user_id, email: credentials.email };
   return session;
 }
@@ -148,12 +158,15 @@ async function userBase() {
 }
 
 async function login() {
-  const code = randomBytes(24).toString("base64url"); // 32 chars; the only secret guarding the handoff slot
+  const code = randomBytes(24).toString("hex"); // 48 hex chars (192 bits): the only secret guarding the handoff slot
   const url = `${SITE}/cli-login?code=${code}`;
-  console.log(`Opening ${url}\nSign in if asked, check the code matches, and click "Authorize this computer".\n\n  Verification code: ${verificationCode(code)}\n`);
+  console.log(`Opening ${url}\nSign in if asked, type this code on the page, and click "Authorize this computer".\n\n  Code: ${verificationCode(code)}\n`);
   const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open";
   execFile(opener, [url], () => {}); // best effort; the URL is printed for headless use
   const slot = `${DOCS}/cliLogins/${code}?key=${API_KEY}`;
+  // Best effort: if we're interrupted or time out, don't leave a token behind in case the user authorized late.
+  const cleanup = () => request(slot, { method: "DELETE" }).catch(() => {});
+  process.once("SIGINT", () => cleanup().finally(() => process.exit(130)));
   const deadline = Date.now() + 10 * 60_000;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -161,8 +174,9 @@ async function login() {
     try {
       doc = await request(slot);
     } catch (error) {
-      if (error.status === 404) continue;
-      throw error;
+      if (error.status === 404) continue; // not authorized yet
+      if (error.status === 403) throw error; // expired/forbidden: retrying won't help
+      continue; // network blips, 429, 5xx: keep polling until the deadline
     }
     await request(slot, { method: "DELETE" }); // one-time: never leave the token lying around
     const { uid, email, refreshToken } = fromFields(doc.fields);
@@ -170,6 +184,7 @@ async function login() {
     await getSession(); // proves the token works before we claim success
     return console.log(`Logged in as ${email}. Session saved to ${CREDENTIALS}`);
   }
+  await cleanup();
   throw new Error("Timed out after 10 minutes waiting for the browser. Run `ridv login` again.");
 }
 
@@ -204,6 +219,7 @@ async function add(args, opts) {
 async function list(opts) {
   const base = await userBase();
   const limit = Number(opts.limit ?? 10);
+  if (!Number.isInteger(limit) || limit < 1) throw new Error(`--limit must be a positive whole number, got "${opts.limit}".`);
   const [categories, rows] = await Promise.all([
     getCategories(base),
     api(`${base}:runQuery`, {
@@ -254,7 +270,8 @@ async function main() {
   if (command === "list") return list(opts);
   if (command === "categories") return console.log((await getCategories(await userBase())).map((c) => c.name).sort().join("\n"));
   if (command === "delete") {
-    if (!args[0]) throw new Error("Usage: ridv delete <id>");
+    // Firestore auto-ids are 20 alphanumerics; rejecting anything else stops path tricks like "..".
+    if (!/^[A-Za-z0-9]{20}$/.test(args[0] ?? "")) throw new Error("Usage: ridv delete <id>  (the 20-character id shown by add/list)");
     // exists precondition: a wrong id must fail instead of silently "deleting" nothing.
     await api(`${await userBase()}/expenses/${encodeURIComponent(args[0])}?currentDocument.exists=true`, { method: "DELETE" });
     return console.log(`Deleted ${args[0]}`);

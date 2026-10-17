@@ -52,6 +52,15 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Install Firebase emulator runtime (Java)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Test Firestore security rules (emulator)
+        run: npx firebase emulators:exec --only firestore --project demo-ridv "node --test tests/rules.emulator.mjs"
+
       - name: Build
         run: npm run build
 

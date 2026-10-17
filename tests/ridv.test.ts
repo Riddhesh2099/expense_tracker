@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { matchCategory, matchPayment, parseAmount, parseDate, toFields, verificationCode } from "../bin/ridv.mjs";
 
-test("verificationCode is the last 8 chars, grouped and upper-cased (same as the web page)", () => {
-  assert.equal(verificationCode("x".repeat(24) + "ab_dE-9z"), "AB_D-E-9Z");
+test("verificationCode is the last 8 hex chars, grouped and upper-cased (same as the web page)", () => {
+  assert.equal(verificationCode("0".repeat(40) + "a1b2c3d4"), "A1B2-C3D4");
 });
 
 const now = new Date(2026, 9, 18, 9, 30); // 18 Oct 2026, 09:30 local
@@ -15,6 +15,8 @@ test("parseDate handles keywords and both date orders, at local noon", () => {
   assert.deepEqual(parseDate("2026-10-05", now), new Date(2026, 9, 5, 12));
   assert.deepEqual(parseDate("05-10-2026", now), new Date(2026, 9, 5, 12));
   assert.throws(() => parseDate("2026-02-30", now), /Unrecognised date/);
+  assert.throws(() => parseDate("2026-13-05", now), /Unrecognised date/, "month overflow must not roll into next year");
+  assert.throws(() => parseDate("2026-00-10", now), /Unrecognised date/);
   assert.throws(() => parseDate("last tuesday", now), /Unrecognised date/);
 });
 

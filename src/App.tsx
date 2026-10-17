@@ -235,7 +235,7 @@ export function App() {
     return <AuthScreen />;
   }
 
-  if (window.location.pathname === "/cli-login") {
+  if (window.location.pathname.replace(/\/+$/, "") === "/cli-login") {
     return <CliLogin user={user} />;
   }
 
@@ -842,13 +842,16 @@ function EmptyState({ text }: { text: string }) {
  */
 function CliLogin({ user }: { user: User }) {
   const code = new URLSearchParams(window.location.search).get("code") ?? "";
-  const valid = /^[A-Za-z0-9_-]{32,64}$/.test(code);
+  const valid = /^[0-9a-f]{48}$/.test(code);
   const verification = `${code.slice(-8, -4)}-${code.slice(-4)}`.toUpperCase();
+  const [typed, setTyped] = useState("");
+  // Typing the code from your own terminal is what stops a phishing link (someone else's code) from working.
+  const matches = typed.replace(/[^0-9a-f]/gi, "").toUpperCase() === verification.replace("-", "");
   const [status, setStatus] = useState<"ask" | "busy" | "done">("ask");
   const [error, setError] = useState("");
 
   async function authorize() {
-    if (!db) return;
+    if (!db || !matches) return;
     setStatus("busy");
     setError("");
     try {
@@ -856,7 +859,6 @@ function CliLogin({ user }: { user: User }) {
         uid: user.uid,
         email: user.email ?? "",
         refreshToken: user.refreshToken,
-        createdAt: serverTimestamp(),
         expireAt: Timestamp.fromMillis(Date.now() + 10 * 60_000),
       });
       setStatus("done");
@@ -880,11 +882,19 @@ function CliLogin({ user }: { user: User }) {
               Allow the <strong>ridv</strong> command-line tool to add and read expenses as <strong>{user.email}</strong>.
             </p>
             <p>
-              Only continue if you just ran <code>ridv login</code> yourself and your terminal shows the code:
+              Type the code shown in <strong>your own</strong> terminal after running <code>ridv login</code>. If someone
+              sent you this link, close this tab.
             </p>
-            <pre>{verification}</pre>
+            <input
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              placeholder="XXXX-XXXX"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Code from your terminal"
+            />
             {error && <p className="error">{error}</p>}
-            <button onClick={authorize} disabled={status === "busy"}>
+            <button onClick={authorize} disabled={status === "busy" || !matches}>
               <Check size={18} />
               Authorize this computer
             </button>
