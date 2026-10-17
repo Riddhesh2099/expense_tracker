@@ -29,11 +29,15 @@ import {
   Calendar,
   Check,
   CircleDollarSign,
+  Download,
   Filter,
   LogOut,
+  Pencil,
   Plus,
   Search,
+  Target,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -51,6 +55,7 @@ import {
   YAxis,
 } from "recharts";
 import { auth, db, hasFirebaseConfig, missingFirebaseConfig } from "./firebase";
+import { budgetStatus, expensesToCsv, formatInputDate, formatMoney, isSameMonth, monthlyTotals } from "./lib";
 import type { Category, DateRange, Expense, SortKey } from "./types";
 
 const defaultCategories = [
@@ -64,25 +69,20 @@ const defaultCategories = [
   ["Other", "#64748b"],
 ] as const;
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-});
-
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
   if (value instanceof Date) return value;
   return new Date();
 }
 
-function formatMoney(amount: number) {
-  return currencyFormatter.format(amount);
-}
-
-function formatInputDate(date: Date) {
-  // toISOString would shift to UTC and show yesterday's date for
-  // timezones ahead of UTC in the early morning.
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+function downloadCsv(expenses: Expense[], categories: Map<string, Category>) {
+  const csv = expensesToCsv(expenses, (id) => categories.get(id)?.name ?? "Uncategorized");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `expenses-${formatInputDate(new Date())}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export function App() {
@@ -94,6 +94,7 @@ export function App() {
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date-desc");
+  const [editing, setEditing] = useState<Expense | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -133,6 +134,7 @@ export function App() {
           id: categoryDoc.id,
           name: categoryDoc.data().name,
           color: categoryDoc.data().color,
+          budget: Number(categoryDoc.data().budget ?? 0),
           createdAt: toDate(categoryDoc.data().createdAt),
         })),
       );
@@ -176,12 +178,7 @@ export function App() {
     return expenses
       .filter((expense) => {
         if (categoryFilter !== "all" && expense.categoryId !== categoryFilter) return false;
-        if (dateRange === "month") {
-          return (
-            expense.expenseDate.getMonth() === now.getMonth() &&
-            expense.expenseDate.getFullYear() === now.getFullYear()
-          );
-        }
+        if (dateRange === "month") return isSameMonth(expense.expenseDate, now);
         if (dateRange === "year") {
           return expense.expenseDate.getFullYear() === now.getFullYear();
         }
@@ -206,11 +203,9 @@ export function App() {
 
   const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const monthTotal = expenses
-    .filter((expense) => {
-      const now = new Date();
-      return expense.expenseDate.getMonth() === now.getMonth() && expense.expenseDate.getFullYear() === now.getFullYear();
-    })
+    .filter((expense) => isSameMonth(expense.expenseDate, new Date()))
     .reduce((sum, expense) => sum + expense.amount, 0);
+  const budgets = budgetStatus(categories, expenses);
 
   const categoryChart = categories
     .map((category) => ({
@@ -222,17 +217,7 @@ export function App() {
     }))
     .filter((item) => item.value > 0);
 
-  const monthlyChart = useMemo(() => {
-    const buckets = new Map<string, number>();
-    expenses.forEach((expense) => {
-      const key = expense.expenseDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-      buckets.set(key, (buckets.get(key) ?? 0) + expense.amount);
-    });
-    return [...buckets.entries()]
-      .map(([month, amount]) => ({ month, amount }))
-      .reverse()
-      .slice(-12);
-  }, [expenses]);
+  const monthlyChart = useMemo(() => monthlyTotals(expenses), [expenses]);
 
   if (!hasFirebaseConfig) {
     return <ConfigMissing missing={missingFirebaseConfig} />;
@@ -266,9 +251,37 @@ export function App() {
       </section>
 
       <section className="workspace">
-        <ExpenseForm userId={user.uid} categories={categories} />
-        <CategoryManager userId={user.uid} categories={categories} />
+        <ExpenseForm
+          key={editing?.id ?? "new"}
+          userId={user.uid}
+          categories={categories}
+          editing={editing}
+          onDone={() => setEditing(null)}
+        />
+        <CategoryManager userId={user.uid} categories={categories} expenses={expenses} />
       </section>
+
+      {budgets.length > 0 && (
+        <section className="panel budget-panel">
+          <div className="panel-title">
+            <Target size={20} />
+            <h2>Budgets this month</h2>
+          </div>
+          {budgets.map(({ category, spent, budget, ratio }) => (
+            <div className="budget-row" key={category.id}>
+              <span>{category.name}</span>
+              <div className="budget-bar">
+                <span
+                  style={{ width: `${Math.min(ratio, 1) * 100}%`, backgroundColor: ratio > 1 ? "#dc2626" : category.color }}
+                />
+              </div>
+              <span className={ratio > 1 ? "over" : ""}>
+                {formatMoney(spent)} / {formatMoney(budget)}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="toolbar">
         <label className="search-field">
@@ -295,6 +308,14 @@ export function App() {
           <option value="amount-asc">Amount low to high</option>
           <option value="title">Title A-Z</option>
         </select>
+        <button
+          className="ghost"
+          onClick={() => downloadCsv(filteredExpenses, categoryById)}
+          disabled={!filteredExpenses.length}
+        >
+          <Download size={18} />
+          CSV
+        </button>
       </section>
 
       <section className="charts">
@@ -333,23 +354,35 @@ export function App() {
         </ChartPanel>
 
         <ChartPanel title="Category bars">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={categoryChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value) => formatMoney(Number(value))} />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                {categoryChart.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          {categoryChart.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={categoryChart}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  {categoryChart.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState text="Add an expense to see category totals." />
+          )}
         </ChartPanel>
       </section>
 
-      <ExpenseList expenses={filteredExpenses} categories={categoryById} userId={user.uid} />
+      <ExpenseList
+        expenses={filteredExpenses}
+        categories={categoryById}
+        userId={user.uid}
+        onEdit={(expense) => {
+          setEditing(expense);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
     </main>
   );
 }
@@ -480,14 +513,25 @@ function shouldUseRedirectFallback(caught: unknown) {
   return authDomain !== "" && window.location.hostname === authDomain;
 }
 
-function ExpenseForm({ userId, categories }: { userId: string; categories: Category[] }) {
-  const [title, setTitle] = useState("");
-  const [merchant, setMerchant] = useState("");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Card");
-  const [expenseDate, setExpenseDate] = useState(formatInputDate(new Date()));
-  const [notes, setNotes] = useState("");
+function ExpenseForm({
+  userId,
+  categories,
+  editing,
+  onDone,
+}: {
+  userId: string;
+  categories: Category[];
+  editing: Expense | null;
+  onDone: () => void;
+}) {
+  // Remounted via `key` when `editing` changes, so these initialisers always see the right expense.
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [merchant, setMerchant] = useState(editing?.merchant ?? "");
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(editing?.paymentMethod || "Card");
+  const [expenseDate, setExpenseDate] = useState(formatInputDate(editing?.expenseDate ?? new Date()));
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -505,18 +549,23 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
     }
     setBusy(true);
     setError("");
+    const fields = {
+      title,
+      merchant,
+      amount: parsedAmount,
+      currency: "INR",
+      categoryId,
+      paymentMethod,
+      notes,
+      expenseDate: Timestamp.fromDate(new Date(`${expenseDate}T12:00:00`)),
+    };
     try {
-      await addDoc(collection(db, "users", userId, "expenses"), {
-        title,
-        merchant,
-        amount: parsedAmount,
-        currency: "INR",
-        categoryId,
-        paymentMethod,
-        notes,
-        expenseDate: Timestamp.fromDate(new Date(`${expenseDate}T12:00:00`)),
-        createdAt: serverTimestamp(),
-      });
+      if (editing) {
+        await updateDoc(doc(db, "users", userId, "expenses", editing.id), fields);
+        onDone();
+        return;
+      }
+      await addDoc(collection(db, "users", userId, "expenses"), { ...fields, createdAt: serverTimestamp() });
       setTitle("");
       setMerchant("");
       setAmount("");
@@ -531,8 +580,8 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
   return (
     <form className="panel form-panel" onSubmit={submit}>
       <div className="panel-title">
-        <Plus size={20} />
-        <h2>Add expense</h2>
+        {editing ? <Pencil size={20} /> : <Plus size={20} />}
+        <h2>{editing ? "Edit expense" : "Add expense"}</h2>
       </div>
       <div className="field-grid">
         <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" required />
@@ -556,15 +605,31 @@ function ExpenseForm({ userId, categories }: { userId: string; categories: Categ
       </div>
       <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes" rows={3} />
       {error && <p className="error">{error}</p>}
-      <button disabled={busy || !categories.length}>
-        <Check size={18} />
-        Save expense
-      </button>
+      <div className="form-actions">
+        <button disabled={busy || !categories.length}>
+          <Check size={18} />
+          {editing ? "Update expense" : "Save expense"}
+        </button>
+        {editing && (
+          <button type="button" className="ghost" onClick={onDone}>
+            <X size={18} />
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }
 
-function CategoryManager({ userId, categories }: { userId: string; categories: Category[] }) {
+function CategoryManager({
+  userId,
+  categories,
+  expenses,
+}: {
+  userId: string;
+  categories: Category[];
+  expenses: Expense[];
+}) {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#2563eb");
   const [error, setError] = useState("");
@@ -585,6 +650,57 @@ function CategoryManager({ userId, categories }: { userId: string; categories: C
     }
   }
 
+  async function update(category: Category, fields: Partial<Pick<Category, "name" | "budget">>) {
+    if (!db) return;
+    setError("");
+    try {
+      await updateDoc(doc(db, "users", userId, "categories", category.id), fields);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update the category.");
+    }
+  }
+
+  function rename(category: Category) {
+    const next = window.prompt("Rename category", category.name)?.trim();
+    if (next && next !== category.name) update(category, { name: next });
+  }
+
+  function saveBudget(category: Category, raw: string) {
+    const budget = raw.trim() === "" ? 0 : Number(raw);
+    if (!Number.isFinite(budget) || budget < 0) {
+      setError("Budget must be a positive number, or empty for no budget.");
+      return;
+    }
+    if (budget !== (category.budget ?? 0)) update(category, { budget });
+  }
+
+  async function remove(category: Category) {
+    const firestore = db;
+    if (!firestore) return;
+    const fallback = categories.find((c) => c.id !== category.id && c.name === "Other") ?? categories.find((c) => c.id !== category.id);
+    if (!fallback) {
+      setError("Keep at least one category.");
+      return;
+    }
+    const used = expenses.filter((expense) => expense.categoryId === category.id);
+    const message = used.length
+      ? `Delete "${category.name}"? Its ${used.length} expense(s) will move to "${fallback.name}".`
+      : `Delete "${category.name}"?`;
+    if (!window.confirm(message)) return;
+    setError("");
+    try {
+      // ponytail: one batch caps at 500 writes; chunk it if a category ever holds more expenses than that.
+      const batch = writeBatch(firestore);
+      used.forEach((expense) =>
+        batch.update(doc(firestore, "users", userId, "expenses", expense.id), { categoryId: fallback.id }),
+      );
+      batch.delete(doc(firestore, "users", userId, "categories", category.id));
+      await batch.commit();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete the category.");
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">
@@ -597,12 +713,27 @@ function CategoryManager({ userId, categories }: { userId: string; categories: C
         <button>Add</button>
       </form>
       {error && <p className="error">{error}</p>}
-      <div className="chips">
+      <div className="category-list">
         {categories.map((category) => (
-          <span className="chip" key={category.id}>
-            <span style={{ backgroundColor: category.color }} />
-            {category.name}
-          </span>
+          <div className="category-row" key={category.id}>
+            <span className="dot" style={{ backgroundColor: category.color }} />
+            <span className="category-name">{category.name}</span>
+            <input
+              key={category.budget ?? 0}
+              defaultValue={category.budget || ""}
+              onBlur={(event) => saveBudget(category, event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+              placeholder="Budget ₹"
+              inputMode="decimal"
+              aria-label={`Monthly budget for ${category.name}`}
+            />
+            <button className="icon-only ghost" type="button" onClick={() => rename(category)} aria-label={`Rename ${category.name}`}>
+              <Pencil size={16} />
+            </button>
+            <button className="icon-only ghost" type="button" onClick={() => remove(category)} aria-label={`Delete ${category.name}`}>
+              <Trash2 size={16} />
+            </button>
+          </div>
         ))}
       </div>
     </section>
@@ -613,10 +744,12 @@ function ExpenseList({
   expenses,
   categories,
   userId,
+  onEdit,
 }: {
   expenses: Expense[];
   categories: Map<string, Category>;
   userId: string;
+  onEdit: (expense: Expense) => void;
 }) {
   async function removeExpense(expense: Expense) {
     if (!db) return;
@@ -656,6 +789,9 @@ function ExpenseList({
                   {category?.name ?? "Uncategorized"}
                 </span>
                 <strong>{formatMoney(expense.amount)}</strong>
+                <button className="icon-only ghost" onClick={() => onEdit(expense)} aria-label={`Edit ${expense.title}`}>
+                  <Pencil size={18} />
+                </button>
                 <button className="icon-only" onClick={() => removeExpense(expense)} aria-label={`Delete ${expense.title}`}>
                   <Trash2 size={18} />
                 </button>

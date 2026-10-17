@@ -10,3 +10,4 @@ firebase-debug.log
 *.tsbuildinfo
 .gcloud
 .config
+graphify-out
