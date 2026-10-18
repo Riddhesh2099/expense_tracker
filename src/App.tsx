@@ -12,7 +12,7 @@ import {
   Timestamp,
   updateDoc,
   writeBatch,
-} from "firebase/firestore";
+} from "./store";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -31,6 +31,7 @@ import {
   Check,
   CircleDollarSign,
   Download,
+  Eye,
   Filter,
   LogOut,
   Moon,
@@ -60,6 +61,7 @@ import {
 import { auth, db, hasFirebaseConfig, missingFirebaseConfig } from "./firebase";
 import { budgetStatus, expensesToCsv, formatInputDate, formatMoney, isSameMonth, monthlyTotals } from "./lib";
 import { SplitApp } from "./SplitPage";
+import { enterGuestPreview, exitGuestPreview, isGuest } from "./store";
 import type { Category, DateRange, Expense, SortKey } from "./types";
 
 const defaultCategories = [
@@ -89,9 +91,12 @@ function downloadCsv(expenses: Expense[], categories: Map<string, Category>) {
   setTimeout(() => URL.revokeObjectURL(url), 0); // revoking synchronously is flaky in Safari
 }
 
+// Guest preview: no Firebase account at all; data lives in this browser via src/localStore.ts.
+const GUEST_USER = { uid: "guest", email: null, displayName: "Guest", isAnonymous: true, refreshToken: "" } as unknown as User;
+
 export function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [user, setUser] = useState<User | null>(isGuest ? GUEST_USER : null);
+  const [authReady, setAuthReady] = useState(isGuest);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [search, setSearch] = useState("");
@@ -101,7 +106,7 @@ export function App() {
   const [editing, setEditing] = useState<Expense | null>(null);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || isGuest) return;
     return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthReady(true);
@@ -500,6 +505,15 @@ function AuthScreen() {
           {mode === "login" ? "Create a new account" : "Use an existing account"}
         </button>
       </form>
+      <button
+        className="icon-only ghost guest-fab"
+        type="button"
+        onClick={enterGuestPreview}
+        aria-label="Preview without signing in"
+        title="Preview without signing in (data stays in this browser)"
+      >
+        <Eye size={20} />
+      </button>
     </main>
   );
 }
@@ -870,10 +884,23 @@ function TopbarActions() {
       <button className="icon-only ghost" onClick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>
         {dark ? <Sun size={18} /> : <Moon size={18} />}
       </button>
-      <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
-        <LogOut size={18} />
-        Sign out
-      </button>
+      {isGuest ? (
+        <button
+          className="icon-text ghost"
+          onClick={() => {
+            if (!window.confirm("Leave the preview? This deletes the preview data from this browser.")) return;
+            exitGuestPreview(true);
+          }}
+        >
+          <LogOut size={18} />
+          Exit preview
+        </button>
+      ) : (
+        <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
+          <LogOut size={18} />
+          Sign out
+        </button>
+      )}
     </div>
   );
 }
@@ -895,7 +922,13 @@ function Hub({ user, monthTotal }: { user: User; monthTotal: number }) {
         <TopbarActions />
       </header>
       <p className="hub-intro">
-        Signed in as {user.email}. Everything here also works from the terminal or an AI agent via <code>ridv</code>.
+        {isGuest ? (
+          <>Preview mode: no account, nothing leaves this browser. Sign in to save your data and use <code>ridv</code>.</>
+        ) : (
+          <>
+            Signed in as {user.email}. Everything here also works from the terminal or an AI agent via <code>ridv</code>.
+          </>
+        )}
       </p>
       <section className="hub-grid">
         {HUB_APPS.map((app) =>
@@ -923,6 +956,21 @@ function Hub({ user, monthTotal }: { user: User; monthTotal: number }) {
  * browser's Firebase refresh token there. The CLI reads it once and deletes it; leftovers expire via TTL.
  */
 function CliLogin({ user }: { user: User }) {
+  if (isGuest) {
+    return (
+      <main className="auth-screen">
+        <section className="auth-panel">
+          <h1>Authorize ridv</h1>
+          <p>You're in preview mode, which has no account. Exit the preview and sign in to use ridv.</p>
+          <button onClick={() => exitGuestPreview(false)}>Exit preview</button>
+        </section>
+      </main>
+    );
+  }
+  return <CliLoginPanel user={user} />;
+}
+
+function CliLoginPanel({ user }: { user: User }) {
   const code = new URLSearchParams(window.location.search).get("code") ?? "";
   const valid = /^[0-9a-f]{48}$/.test(code);
   const verification = `${code.slice(-8, -4)}-${code.slice(-4)}`.toUpperCase();

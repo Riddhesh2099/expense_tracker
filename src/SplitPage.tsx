@@ -15,7 +15,7 @@ import {
   updateDoc,
   where,
   writeBatch,
-} from "firebase/firestore";
+} from "./store";
 import type { User } from "firebase/auth";
 import { ArrowRightLeft, Check, Plus, Trash2, Users } from "lucide-react";
 import { db } from "./firebase";
