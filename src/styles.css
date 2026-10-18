@@ -112,6 +112,49 @@ h2 {
   color: #0f172a;
 }
 
+a.eyebrow {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.hub-intro {
+  color: #64748b;
+}
+
+.hub-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hub-card {
+  color: inherit;
+  display: grid;
+  gap: 8px;
+  min-height: 170px;
+  text-decoration: none;
+}
+
+a.hub-card:hover {
+  border-color: #2563eb;
+}
+
+.hub-card p {
+  color: #64748b;
+  margin: 0;
+}
+
+.hub-card.disabled {
+  opacity: 0.6;
+}
+
+.soon {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 a.link-button {
   border-radius: 8px;
   font-weight: 700;
@@ -442,6 +485,7 @@ a.link-button {
   .summary-grid,
   .workspace,
   .charts,
+  .hub-grid,
   .toolbar {
     grid-template-columns: 1fr;
   }
