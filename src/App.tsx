@@ -33,9 +33,11 @@ import {
   Download,
   Filter,
   LogOut,
+  Moon,
   Pencil,
   Plus,
   Search,
+  Sun,
   Target,
   Trash2,
   X,
@@ -253,10 +255,7 @@ export function App() {
           </a>
           <h1>Expenses</h1>
         </div>
-        <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
-          <LogOut size={18} />
-          Sign out
-        </button>
+        <TopbarActions />
       </header>
 
       <section className="summary-grid">
@@ -339,7 +338,7 @@ export function App() {
           {monthlyChart.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={monthlyChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.3} />
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
@@ -373,7 +372,7 @@ export function App() {
           {categoryChart.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={categoryChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.3} />
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
@@ -843,6 +842,38 @@ function EmptyState({ text }: { text: string }) {
   return <p className="empty">{text}</p>;
 }
 
+function TopbarActions() {
+  // index.html applies a saved choice before first paint; with none saved, the OS preference decides.
+  const [dark, setDark] = useState(() =>
+    document.documentElement.dataset.theme
+      ? document.documentElement.dataset.theme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+
+  function toggleTheme() {
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("theme", next);
+    } catch {
+      // private mode / blocked storage: the toggle still works for this visit
+    }
+    setDark(!dark);
+  }
+
+  return (
+    <div className="topbar-actions">
+      <button className="icon-only ghost" onClick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>
+        {dark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+      <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
+        <LogOut size={18} />
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 const HUB_APPS = [
   { href: "/expenses", title: "Expenses", blurb: "Log spends in ₹, budgets per category, charts, CSV export.", ready: true },
   { href: null, title: "Split", blurb: "Splitwise-style shared trip costs and settle-ups.", ready: false },
@@ -857,10 +888,7 @@ function Hub({ user, monthTotal }: { user: User; monthTotal: number }) {
           <p className="eyebrow">Ridventure</p>
           <h1>Travel</h1>
         </div>
-        <button className="icon-text ghost" onClick={() => auth && signOut(auth)}>
-          <LogOut size={18} />
-          Sign out
-        </button>
+        <TopbarActions />
       </header>
       <p className="hub-intro">
         Signed in as {user.email}. Everything here also works from the terminal or an AI agent via <code>ridv</code>.
