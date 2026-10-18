@@ -33,11 +33,25 @@ ridv add 450 Lunch -m Truffles -d yesterday -p upi -c food
 - Don't guess the amount. If it's missing or ambiguous, ask. Echo back the `Added …` line so the user can check.
 - Use `--json` when you need to chain commands (e.g. keep the id for a possible undo).
 
+## Splitting group costs (ridv split)
+
+"Split 1200 dinner with Bhavika and Ankit in Goa, I paid" →
+`ridv split add 1200 Dinner -g goa -w "me,Bhavika,Ankit"` (paid-by defaults to the user; `--paid-by Ankit` otherwise).
+
+- `ridv split groups` · `ridv split new <name> -w "A,B" [--currency INR]` · `ridv split balances -g <group>` ·
+  `ridv split settle -g <group> --from A --to B [amount]` (amount defaults to the suggested settle-up).
+- CLI splits are equal only; exact/percent splits are on the web (`/split`). `-w` lists everyone in the split
+  (default: all members); "me" means the user. Groups/members match by name or unique prefix.
+- v1 groups are owned by their creator; other members are name-only (no account). If the group has
+  "add my share to Expenses" on (INR groups only), the user's share is also logged as a personal expense.
+- Maths lives in `src/split.ts` (minor-unit rounding, balances, greedy settle-up), shared by web + CLI.
+
 ## Layout
 
 | Path | What |
 |---|---|
 | `src/App.tsx` | The whole UI: auth screen, `/cli-login` page, form, categories + budgets, filters, charts, list |
+| `src/SplitPage.tsx`, `src/split.ts` | Split UI (`/split`, `/split?g=<id>`) and its pure money maths |
 | `src/lib.ts` | Pure helpers (money/date formatting, monthly totals, budgets, CSV) — keep logic here, testable |
 | `src/firebase.ts`, `src/types.ts` | Firebase init from `VITE_FIREBASE_*`; shared types |
 | `bin/ridv.mjs` | CLI. Pure helpers are exported and unit-tested; I/O below them |
