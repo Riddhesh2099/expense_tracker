@@ -30,6 +30,32 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // Split groups. v1: groups belong to their creator (memberUids == [creator]); other members are
+    // name-only entries in `members`. Linking members to accounts later = a deliberate rules change.
+    function isGroupMember(groupId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids;
+    }
+
+    match /groups/{groupId} {
+      allow get, list: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid];
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.memberUids
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.memberUids == resource.data.memberUids;
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+
+      match /expenses/{expenseId} {
+        allow read, write: if isGroupMember(groupId);
+      }
+      match /settlements/{settlementId} {
+        allow read, write: if isGroupMember(groupId);
+      }
+    }
+
     match /users/{userId} {
       allow read, write: if ownsUserDoc(userId);
 

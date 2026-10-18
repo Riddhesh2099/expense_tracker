@@ -8,6 +8,7 @@ import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { balances, computeShares, CURRENCIES, formatCurrency, simplify } from "../src/split.ts";
 
 const PROJECT = "project-dc59a57a-442b-4b6a-a3f";
 const API_KEY = "AIzaSyAaGPkRzftcI83LmQosIkjHFKofGALxLvo"; // public Firebase web key (ships in the website bundle)
@@ -29,6 +30,13 @@ const USAGE = `ridv — expense tracker CLI (expenses.ridventure.com)
   ridv delete <id>            delete one expense (ids are shown by add/list)
   add --json / list --json    machine-readable output
 
+  ridv split groups                                   your split groups
+  ridv split new <name> -w "A,B" [--currency INR]     create a group (you + A + B)
+  ridv split add <amount> <title...> -g <group> [--paid-by A] [-w "A,B"] [-d date]
+      equal split among -w (default: everyone); paid-by defaults to you; "me" works as a name
+  ridv split balances -g <group>                      who owes whom + suggested settle-up
+  ridv split settle -g <group> --from A --to B [amount]   record a payment (default: suggested amount)
+
   Session is stored in ${CREDENTIALS} (owner-only).`;
 
 // ---------- pure helpers (tested in tests/ridv.test.ts) ----------
@@ -46,14 +54,29 @@ export function parseDate(text = "today", now = new Date()) {
   return date;
 }
 
-export function matchCategory(categories, query) {
+/** Case-insensitive exact name, else a unique prefix; otherwise a helpful error listing the options. */
+export function matchByName(items, query, label) {
   const q = query.trim().toLowerCase();
-  const exact = categories.find((c) => c.name.toLowerCase() === q);
+  const exact = items.find((c) => c.name.toLowerCase() === q);
   if (exact) return exact;
-  const prefixed = categories.filter((c) => c.name.toLowerCase().startsWith(q));
+  const prefixed = items.filter((c) => c.name.toLowerCase().startsWith(q));
   if (prefixed.length === 1) return prefixed[0];
-  const names = categories.map((c) => c.name).join(", ");
-  throw new Error(`${prefixed.length ? "Ambiguous" : "Unknown"} category "${query}". Categories: ${names}`);
+  const names = items.map((c) => c.name).join(", ");
+  const plural = label === "category" ? "Categories" : `${label[0].toUpperCase()}${label.slice(1)}s`;
+  throw new Error(`${prefixed.length ? "Ambiguous" : "Unknown"} ${label} "${query}". ${plural}: ${names}`);
+}
+
+export function matchCategory(categories, query) {
+  return matchByName(categories, query, "category");
+}
+
+/** Resolve a member by name; "me"/"I"/"myself" means the signed-in user's member entry. */
+export function matchMember(members, query, myUid) {
+  if (["me", "i", "myself"].includes(query.trim().toLowerCase())) {
+    const me = members.find((m) => m.uid === myUid);
+    if (me) return me;
+  }
+  return matchByName(members, query, "member");
 }
 
 export function matchPayment(query = "Card") {
@@ -69,19 +92,34 @@ export function parseAmount(text) {
 }
 
 /** JS values -> Firestore REST `fields`, matching what the web SDK writes. */
-export function toFields(object) {
-  const value = (v) =>
-    v instanceof Date
-      ? { timestampValue: v.toISOString() }
-      : typeof v === "number"
-        ? Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v }
-        : { stringValue: String(v) };
-  return Object.fromEntries(Object.entries(object).map(([k, v]) => [k, value(v)]));
+function toValue(v) {
+  if (v instanceof Date) return { timestampValue: v.toISOString() };
+  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (v === null || v === undefined) return { nullValue: null };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue) } };
+  if (typeof v === "object") return { mapValue: { fields: toFields(v) } };
+  return { stringValue: String(v) };
 }
 
-function fromFields(fields = {}) {
-  const value = (v) => v.stringValue ?? v.timestampValue ?? Number(v.integerValue ?? v.doubleValue);
-  return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, value(v)]));
+/** JS values -> Firestore REST `fields`, matching what the web SDK writes (incl. arrays, maps, booleans). */
+export function toFields(object) {
+  return Object.fromEntries(Object.entries(object).map(([k, v]) => [k, toValue(v)]));
+}
+
+function fromValue(v) {
+  if ("stringValue" in v) return v.stringValue;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("arrayValue" in v) return (v.arrayValue.values ?? []).map(fromValue);
+  if ("mapValue" in v) return fromFields(v.mapValue.fields);
+  return null;
+}
+
+export function fromFields(fields = {}) {
+  return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, fromValue(v)]));
 }
 
 /** Short code shown in both the terminal and the browser, so you only approve logins you started. */
@@ -245,6 +283,132 @@ async function list(opts) {
   console.log(`This month: ${money(monthTotal)} across ${expenses.filter((e) => ymd(new Date(e.expenseDate)).startsWith(month)).length} expense(s)`);
 }
 
+// ---------- split ----------
+
+async function getGroups() {
+  const { uid } = await getSession();
+  const rows = await api(`${DOCS}:runQuery`, {
+    method: "POST",
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "groups" }],
+        where: { fieldFilter: { field: { fieldPath: "memberUids" }, op: "ARRAY_CONTAINS", value: { stringValue: uid } } },
+      },
+    }),
+  });
+  return rows.filter((r) => r.document).map((r) => ({ id: r.document.name.split("/").pop(), ...fromFields(r.document.fields) }));
+}
+
+async function findGroup(query) {
+  const groups = await getGroups();
+  if (!query) throw new Error(`Pick a group with -g <name>. Groups: ${groups.map((g) => g.name).join(", ") || "none yet"}`);
+  return matchByName(groups, query, "group");
+}
+
+async function groupDocs(groupId, sub) {
+  const { documents = [] } = await api(`${DOCS}/groups/${groupId}/${sub}?pageSize=300`);
+  return documents.map((d) => ({ id: d.name.split("/").pop(), ...fromFields(d.fields) }));
+}
+
+const newMemberId = () => randomBytes(4).toString("hex");
+
+async function split(args, opts) {
+  const [sub, ...rest] = args;
+  const { uid, email } = await getSession();
+
+  if (sub === "groups") {
+    const groups = await getGroups();
+    if (opts.json) return console.log(JSON.stringify(groups));
+    if (!groups.length) return console.log("No groups yet. Create one: ridv split new <name> -w \"A,B\"");
+    for (const g of groups) console.log(`${g.name}  [${g.currency}]  ${g.members.map((m) => m.name).join(", ")}`);
+    return;
+  }
+
+  if (sub === "new") {
+    const name = rest.join(" ").trim();
+    if (!name) throw new Error('Usage: ridv split new <name> -w "A,B" [--currency INR]');
+    const currency = (opts.currency ?? "INR").toUpperCase();
+    if (!CURRENCIES.includes(currency)) throw new Error(`Currency must be one of ${CURRENCIES.join(", ")}.`);
+    const members = [
+      { id: newMemberId(), name: email.split("@")[0], uid },
+      ...(opts.with ?? "").split(",").map((n) => n.trim()).filter(Boolean).map((n) => ({ id: newMemberId(), name: n })),
+    ];
+    const fields = { name, currency, createdBy: uid, memberUids: [uid], members, autoAddShare: false, createdAt: new Date() };
+    await api(`${DOCS}/groups`, { method: "POST", body: JSON.stringify({ fields: toFields(fields) }) });
+    return console.log(`Created ${name} [${currency}] with ${members.map((m) => m.name).join(", ")}`);
+  }
+
+  const group = await findGroup(opts.group);
+  const money = (n) => formatCurrency(n, group.currency);
+  const name = (id) => group.members.find((m) => m.id === id)?.name ?? "?";
+
+  if (sub === "add") {
+    if (rest.length < 2) throw new Error('Usage: ridv split add <amount> <title...> -g <group> [--paid-by A] [-w "A,B"] [-d date]');
+    const amount = parseAmount(rest[0]);
+    const title = rest.slice(1).join(" ");
+    const paidBy = matchMember(group.members, opts["paid-by"] ?? "me", uid);
+    const participants = opts.with
+      ? opts.with.split(",").map((n) => matchMember(group.members, n, uid).id)
+      : group.members.map((m) => m.id);
+    const shares = computeShares(amount, "equal", [...new Set(participants)]);
+    const date = parseDate(opts.date);
+    const me = group.members.find((m) => m.uid === uid);
+    let personalExpenseId;
+    if (group.autoAddShare && group.currency === "INR" && me && shares[me.id]) {
+      const base = await userBase();
+      const categories = await getCategories(base);
+      const category = categories.find((c) => c.name === "Travel") ?? categories.find((c) => c.name === "Other") ?? categories[0];
+      const personal = await api(`${base}/expenses`, {
+        method: "POST",
+        body: JSON.stringify({
+          fields: toFields({
+            title: `${group.name}: ${title}`, merchant: "", amount: shares[me.id], currency: "INR",
+            categoryId: category?.id ?? "", paymentMethod: "Other", notes: `Your share, split in ${group.name}`,
+            expenseDate: date, createdAt: new Date(),
+          }),
+        }),
+      });
+      personalExpenseId = personal.name.split("/").pop();
+    }
+    const fields = {
+      title, amount, paidBy: paidBy.id, splitMode: "equal", shares, date, createdBy: uid, createdAt: new Date(),
+      ...(personalExpenseId && { personalExpenseId }),
+    };
+    await api(`${DOCS}/groups/${group.id}/expenses`, { method: "POST", body: JSON.stringify({ fields: toFields(fields) }) });
+    const each = Object.entries(shares).map(([id, v]) => `${name(id)} ${money(v)}`).join(", ");
+    return console.log(`Added ${money(amount)} · ${title} to ${group.name}: paid by ${paidBy.name}; shares ${each}${personalExpenseId ? " (your share also added to Expenses)" : ""}`);
+  }
+
+  if (sub === "balances") {
+    const [expenses, settlements] = await Promise.all([groupDocs(group.id, "expenses"), groupDocs(group.id, "settlements")]);
+    const net = balances(group.members, expenses, settlements);
+    const transfers = simplify(net);
+    if (opts.json) return console.log(JSON.stringify({ group: group.name, currency: group.currency, net, transfers: transfers.map((t) => ({ ...t, from: name(t.from), to: name(t.to) })) }));
+    console.log(`${group.name} [${group.currency}]`);
+    for (const m of group.members) console.log(`  ${m.name.padEnd(16)} ${(net[m.id] ?? 0) >= 0 ? "is owed" : "owes   "} ${money(Math.abs(net[m.id] ?? 0))}`);
+    console.log(transfers.length ? "To settle:" : "All settled up.");
+    for (const t of transfers) console.log(`  ${name(t.from)} pays ${name(t.to)} ${money(t.amount)}`);
+    return;
+  }
+
+  if (sub === "settle") {
+    if (!opts.from || !opts.to) throw new Error("Usage: ridv split settle -g <group> --from A --to B [amount]");
+    const from = matchMember(group.members, opts.from, uid);
+    const to = matchMember(group.members, opts.to, uid);
+    let amount = rest[0] ? parseAmount(rest[0]) : undefined;
+    if (amount === undefined) {
+      const [expenses, settlements] = await Promise.all([groupDocs(group.id, "expenses"), groupDocs(group.id, "settlements")]);
+      amount = simplify(balances(group.members, expenses, settlements)).find((t) => t.from === from.id && t.to === to.id)?.amount;
+      if (!amount) throw new Error(`${from.name} doesn't owe ${to.name} in the suggested settle-up. Pass an amount explicitly.`);
+    }
+    const fields = { from: from.id, to: to.id, amount, date: new Date(), createdBy: uid };
+    await api(`${DOCS}/groups/${group.id}/settlements`, { method: "POST", body: JSON.stringify({ fields: toFields(fields) }) });
+    return console.log(`Recorded: ${from.name} paid ${to.name} ${money(amount)} in ${group.name}`);
+  }
+
+  throw new Error("Usage: ridv split groups | new | add | balances | settle  (see ridv --help)");
+}
+
 async function main() {
   const { values: opts, positionals } = parseArgs({
     allowPositionals: true,
@@ -255,6 +419,12 @@ async function main() {
       payment: { type: "string", short: "p" },
       notes: { type: "string", short: "n" },
       limit: { type: "string", short: "l" },
+      group: { type: "string", short: "g" },
+      with: { type: "string", short: "w" },
+      "paid-by": { type: "string" },
+      currency: { type: "string" },
+      from: { type: "string" },
+      to: { type: "string" },
       json: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -269,6 +439,7 @@ async function main() {
     return console.log("Logged out (local session removed).");
   }
   if (command === "whoami") return console.log((await getSession()).email);
+  if (command === "split") return split(args, opts);
   if (command === "add") return add(args, opts);
   if (command === "list") return list(opts);
   if (command === "categories") return console.log((await getCategories(await userBase())).map((c) => c.name).sort().join("\n"));

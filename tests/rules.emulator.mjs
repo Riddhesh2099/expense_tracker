@@ -70,6 +70,44 @@ test("cliLogins: readable by code until expiry, never listable or updatable, del
   assert.equal(await call("GET", `cliLogins/${code("read")}`), 404);
 });
 
+test("groups: creator-only in v1; others can't read, join, or touch expenses/settlements", async () => {
+  const uids = (...ids) => ({ arrayValue: { values: ids.map((stringValue) => ({ stringValue })) } });
+  const group = (createdBy, memberUids) => ({
+    name: { stringValue: "Goa" }, currency: { stringValue: "INR" }, createdBy: { stringValue: createdBy }, memberUids,
+  });
+  assert.equal(await call("POST", "groups?documentId=g1", { uid: "alice", fields: group("alice", uids("alice")) }), 200);
+  assert.equal(await call("POST", "groups?documentId=g2", { uid: "alice", fields: group("alice", uids("alice", "bob")) }), 403, "can't add accounts yet");
+  assert.equal(await call("POST", "groups?documentId=g3", { uid: "alice", fields: group("bob", uids("bob")) }), 403, "createdBy must be you");
+  assert.equal(await call("GET", "groups/g1", { uid: "alice" }), 200);
+  assert.equal(await call("GET", "groups/g1", { uid: "bob" }), 403);
+  assert.equal(await call("GET", "groups/g1"), 403);
+  assert.equal(await call("PATCH", "groups/g1", { uid: "alice", fields: group("alice", uids("alice", "bob")) }), 403, "memberUids frozen");
+  assert.equal(await call("PATCH", "groups/g1", { uid: "bob", fields: group("bob", uids("bob")) }), 403);
+
+  const e = { amount: { integerValue: "300" }, paidBy: { stringValue: "m1" } };
+  assert.equal(await call("POST", "groups/g1/expenses?documentId=x1", { uid: "alice", fields: e }), 200);
+  assert.equal(await call("GET", "groups/g1/expenses/x1", { uid: "bob" }), 403);
+  assert.equal(await call("POST", "groups/g1/expenses?documentId=x2", { uid: "bob", fields: e }), 403);
+  assert.equal(await call("POST", "groups/g1/settlements?documentId=s1", { uid: "alice", fields: e }), 200);
+  assert.equal(await call("POST", "groups/g1/settlements?documentId=s2", { uid: "bob", fields: e }), 403);
+
+  // The app lists "my groups" with array-contains; that query must be allowed for members.
+  const res = await fetch(`${DOCS}:runQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenFor("alice")}` },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "groups" }],
+        where: { fieldFilter: { field: { fieldPath: "memberUids" }, op: "ARRAY_CONTAINS", value: { stringValue: "alice" } } },
+      },
+    }),
+  });
+  assert.equal(res.status, 200);
+  assert.ok((await res.json()).some((r) => r.document?.name.endsWith("/groups/g1")));
+  assert.equal(await call("DELETE", "groups/g1", { uid: "bob" }), 403);
+  assert.equal(await call("DELETE", "groups/g1", { uid: "alice" }), 200);
+});
+
 test("users/{uid}: only the owner can read and write", async () => {
   const expense = { title: { stringValue: "Lunch" }, amount: { integerValue: "100" } };
   assert.equal(await call("POST", "users/alice/expenses?documentId=e1", { uid: "alice", fields: expense }), 200);
