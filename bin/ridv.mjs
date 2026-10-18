@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ridv — add, list and delete expenses in the expense tracker from a terminal or an AI agent.
-// Auth: `ridv login` hands this browser-free tool a Firebase session from expenses.ridventure.com; every call then
+// Auth: `ridv login` hands this browser-free tool a Firebase session from travel.ridventure.com; every call then
 // runs as that user, under the same Firestore security rules as the website. Talks to Firestore REST directly.
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -11,11 +11,11 @@ import { parseArgs } from "node:util";
 
 const PROJECT = "project-dc59a57a-442b-4b6a-a3f";
 const API_KEY = "AIzaSyAaGPkRzftcI83LmQosIkjHFKofGALxLvo"; // public Firebase web key (ships in the website bundle)
-const SITE = process.env.RIDV_SITE ?? "https://expenses.ridventure.com";
+const SITE = process.env.RIDV_SITE ?? "https://travel.ridventure.com";
 const DOCS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 const CREDENTIALS = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "ridv", "credentials.json");
 const PAYMENTS = ["Card", "Cash", "UPI", "Bank transfer", "Other"];
-const USAGE = `ridv — expense tracker CLI (expenses.ridventure.com)
+const USAGE = `ridv — Ridventure travel CLI (travel.ridventure.com)
 
   ridv login                  sign in via the browser (Google or email), once per computer
   ridv whoami | logout

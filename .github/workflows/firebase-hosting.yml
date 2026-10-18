@@ -22,8 +22,8 @@ env:
   # Firebase web config is public by design (it ships in every page load), so it lives here.
   VITE_FIREBASE_API_KEY: AIzaSyAaGPkRzftcI83LmQosIkjHFKofGALxLvo
   # Custom domain (Firebase Hosting serves /__/auth/handler on it), so Google's account picker says
-  # "continue to expenses.ridventure.com". Its handler URL must be a redirect URI on the Google OAuth client.
-  VITE_FIREBASE_AUTH_DOMAIN: expenses.ridventure.com
+  # "continue to travel.ridventure.com". Its handler URL must be a redirect URI on the Google OAuth client.
+  VITE_FIREBASE_AUTH_DOMAIN: travel.ridventure.com
   VITE_FIREBASE_PROJECT_ID: project-dc59a57a-442b-4b6a-a3f
   VITE_FIREBASE_STORAGE_BUCKET: project-dc59a57a-442b-4b6a-a3f.firebasestorage.app
   VITE_FIREBASE_MESSAGING_SENDER_ID: "767682202840"
