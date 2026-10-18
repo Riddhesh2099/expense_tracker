@@ -5,11 +5,13 @@ Guide for AI agents working in this repo or acting for its user. Humans: see REA
 ## What this is
 
 A personal, mobile-first expense tracker (amounts in ₹), the first app of a planned travel hub on
-`*.ridventure.com`. Live at **https://expenses.ridventure.com**.
+`*.ridventure.com`. Live at **https://travel.ridventure.com** (`ridventure.com`, `www.` and the old
+`expenses.ridventure.com` redirect there). The apex is deliberately kept free for a future umbrella site.
 
 - React 19 + Vite + TypeScript SPA, Firebase Auth (Google + email/password), Cloud Firestore.
 - Firebase/GCP project `project-dc59a57a-442b-4b6a-a3f` (Spark/free plan: no billing, so no Cloud
-  Functions, no Firestore TTL). DNS for `ridventure.com` is on Cloudflare (proxied) → Firebase Hosting.
+  Functions, no Firestore TTL). DNS for `ridventure.com` is on Cloudflare → Firebase Hosting
+  (records DNS-only; keep the proxy off when adding a domain so Firebase can verify it and issue the cert).
 - `bin/ridv.mjs`: zero-dependency CLI so a person or an AI agent can add/list/delete expenses.
 
 ## Adding expenses for the user (ridv)
@@ -93,6 +95,6 @@ Run lint, tests, rules tests and build before pushing. CI runs the same, plus `f
 
 ## Changing the domain/auth setup
 
-`authDomain` is `expenses.ridventure.com` (so Google's picker shows it). It must stay in Firebase Auth's
-authorized domains, and `https://expenses.ridventure.com/__/auth/handler` must stay a redirect URI on the
+`authDomain` is `travel.ridventure.com` (so Google's picker shows it). It must stay in Firebase Auth's
+authorized domains, and `https://travel.ridventure.com/__/auth/handler` must stay a redirect URI on the
 "Web client (auto created by Google Service)" OAuth client — that one is console-only, ask the user.

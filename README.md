@@ -4,7 +4,8 @@ A mobile-first expense tracker backed by Firebase Authentication and Cloud Fires
 
 ## Features
 
-Live at **https://expenses.ridventure.com** (Cloudflare DNS → Firebase Hosting).
+Live at **https://travel.ridventure.com** (Cloudflare DNS → Firebase Hosting). `ridventure.com`, `www.ridventure.com`
+and the old `expenses.ridventure.com` redirect there.
 
 - Email/password or Google sign in
 - Add, edit and delete expenses (amounts in ₹) from mobile or desktop
@@ -86,11 +87,11 @@ The deploy publishes:
 
 Current deployed v1:
 
-- Custom domain: https://expenses.ridventure.com (also listed under Authentication > Settings > Authorized domains)
-- Sign-in runs through the custom domain (`authDomain = expenses.ridventure.com`), so Google's account picker
+- Custom domain: https://travel.ridventure.com (also listed under Authentication > Settings > Authorized domains)
+- Sign-in runs through the custom domain (`authDomain = travel.ridventure.com`), so Google's account picker
   shows it instead of `project-…firebaseapp.com`. This needs, on the "Web client (auto created by Google Service)"
-  OAuth client in Google Cloud > APIs & Services > Credentials: JS origin `https://expenses.ridventure.com` and
-  redirect URI `https://expenses.ridventure.com/__/auth/handler`. For local dev keep the firebaseapp.com
+  OAuth client in Google Cloud > APIs & Services > Credentials: JS origin `https://travel.ridventure.com` and
+  redirect URI `https://travel.ridventure.com/__/auth/handler`. For local dev keep the firebaseapp.com
   authDomain in `.env`.
 - Hosting URL: https://project-dc59a57a-442b-4b6a-a3f.web.app
 - Firebase Console: https://console.firebase.google.com/project/project-dc59a57a-442b-4b6a-a3f/overview
