@@ -75,6 +75,10 @@ Run lint, tests, rules tests and build before pushing. CI runs the same, plus `f
 ## Conventions
 
 - Smallest change that works; no new dependencies without a clear need. The CLI stays dependency-free.
+- Pages import Firestore functions from `./store`, never `firebase/firestore` directly. `store.ts` routes them
+  to Firestore, or to `localStore.ts` (localStorage) in **guest preview** (eye icon on sign-in / `?preview=1`,
+  no account, nothing leaves the browser). Using a new Firestore function or query feature means implementing it
+  in `localStore.ts` too, with a case in `tests/localStore.test.ts`.
 - Amounts are INR numbers; dates are stored as Firestore timestamps at **local noon** (avoids TZ day-shift).
 - Firestore field shapes must match between the web app and `ridv` (integers as `integerValue`, etc.).
 - Any change to `firestore.rules` needs matching cases in `tests/rules.emulator.mjs`.
