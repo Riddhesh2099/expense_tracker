@@ -59,6 +59,7 @@ import {
 } from "recharts";
 import { auth, db, hasFirebaseConfig, missingFirebaseConfig } from "./firebase";
 import { budgetStatus, expensesToCsv, formatInputDate, formatMoney, isSameMonth, monthlyTotals } from "./lib";
+import { SplitApp } from "./SplitPage";
 import type { Category, DateRange, Expense, SortKey } from "./types";
 
 const defaultCategories = [
@@ -241,6 +242,9 @@ export function App() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   if (path === "/cli-login") {
     return <CliLogin user={user} />;
+  }
+  if (path === "/split") {
+    return <SplitApp user={user} categories={categories} />;
   }
   if (path !== "/expenses") {
     return <Hub user={user} monthTotal={monthTotal} />;
@@ -876,7 +880,7 @@ function TopbarActions() {
 
 const HUB_APPS = [
   { href: "/expenses", title: "Expenses", blurb: "Log spends in ₹, budgets per category, charts, CSV export.", ready: true },
-  { href: null, title: "Split", blurb: "Splitwise-style shared trip costs and settle-ups.", ready: false },
+  { href: "/split", title: "Split", blurb: "Splitwise-style shared trip costs and settle-ups.", ready: true },
   { href: null, title: "Flights", blurb: "Search flights and compare prices across sellers.", ready: false },
 ];
 

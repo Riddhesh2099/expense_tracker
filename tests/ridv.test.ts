@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchCategory, matchPayment, parseAmount, parseDate, toFields, verificationCode } from "../bin/ridv.mjs";
+import { fromFields, matchCategory, matchMember, matchPayment, parseAmount, parseDate, toFields, verificationCode } from "../bin/ridv.mjs";
+
+test("matchMember: 'me' maps to your own member; names by exact/prefix; clear errors", () => {
+  const members = [{ id: "1", name: "riddhesh", uid: "u1" }, { id: "2", name: "Bhavika" }, { id: "3", name: "Bharat" }];
+  assert.equal(matchMember(members, "me", "u1").id, "1");
+  assert.equal(matchMember(members, "bhavika", "u1").id, "2");
+  assert.throws(() => matchMember(members, "bha", "u1"), /Ambiguous member "bha". Members: riddhesh, Bhavika, Bharat/);
+  assert.throws(() => matchMember(members, "zed", "u1"), /Unknown member/);
+  const withMe = [...members, { id: "4", name: "Me" }];
+  assert.equal(matchMember(withMe, "me", "u1").id, "4", "a member literally named Me wins over the alias");
+});
+
+test("toFields/fromFields round-trip nested groups (arrays of maps, share maps, booleans)", () => {
+  const group = { name: "Goa", autoAddShare: false, members: [{ id: "m1", name: "Rid", uid: "u1" }, { id: "m2", name: "Ankit" }], shares: { m1: 150, m2: 149.5 } };
+  assert.deepEqual(fromFields(toFields(group)), group);
+  assert.deepEqual(toFields({ ok: true }), { ok: { booleanValue: true } });
+});
 
 test("verificationCode is the last 8 hex chars, grouped and upper-cased (same as the web page)", () => {
   assert.equal(verificationCode("0".repeat(40) + "a1b2c3d4"), "A1B2-C3D4");
