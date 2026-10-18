@@ -108,6 +108,32 @@ test("groups: creator-only in v1; others can't read, join, or touch expenses/set
   assert.equal(await call("DELETE", "groups/g1", { uid: "alice" }), 200);
 });
 
+test("atomic commit (ridv split add): group expense + personal share land together, or neither does", async () => {
+  const uids = { arrayValue: { values: [{ stringValue: "alice" }] } };
+  const group = { name: { stringValue: "Trip" }, createdBy: { stringValue: "alice" }, memberUids: uids };
+  assert.equal(await call("POST", "groups?documentId=t1", { uid: "alice", fields: group }), 200);
+  const db = `projects/${PROJECT}/databases/(default)/documents`;
+  const commit = (uid, writes) =>
+    fetch(`${DOCS}:commit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenFor(uid)}` },
+      body: JSON.stringify({
+        writes: writes.map(([path, title]) => ({
+          update: { name: `${db}/${path}`, fields: { title: { stringValue: title } } },
+          currentDocument: { exists: false },
+        })),
+      }),
+    }).then((r) => r.status);
+
+  assert.equal(await commit("alice", [["users/alice/expenses/p1", "share"], ["groups/t1/expenses/g1", "dinner"]]), 200);
+  assert.equal(await call("GET", "users/alice/expenses/p1", { uid: "alice" }), 200);
+  assert.equal(await call("GET", "groups/t1/expenses/g1", { uid: "alice" }), 200);
+
+  // Second write is forbidden (bob's data) -> the whole commit fails and the first write is NOT applied.
+  assert.equal(await commit("alice", [["groups/t1/expenses/g2", "x"], ["users/bob/expenses/p2", "x"]]), 403);
+  assert.equal(await call("GET", "groups/t1/expenses/g2", { uid: "alice" }), 404, "nothing partial");
+});
+
 test("users/{uid}: only the owner can read and write", async () => {
   const expense = { title: { stringValue: "Lunch" }, amount: { integerValue: "100" } };
   assert.equal(await call("POST", "users/alice/expenses?documentId=e1", { uid: "alice", fields: expense }), 200);

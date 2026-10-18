@@ -8,6 +8,8 @@ test("matchMember: 'me' maps to your own member; names by exact/prefix; clear er
   assert.equal(matchMember(members, "bhavika", "u1").id, "2");
   assert.throws(() => matchMember(members, "bha", "u1"), /Ambiguous member "bha". Members: riddhesh, Bhavika, Bharat/);
   assert.throws(() => matchMember(members, "zed", "u1"), /Unknown member/);
+  const withMe = [...members, { id: "4", name: "Me" }];
+  assert.equal(matchMember(withMe, "me", "u1").id, "4", "a member literally named Me wins over the alias");
 });
 
 test("toFields/fromFields round-trip nested groups (arrays of maps, share maps, booleans)", () => {

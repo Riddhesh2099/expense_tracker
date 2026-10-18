@@ -72,7 +72,9 @@ export function matchCategory(categories, query) {
 
 /** Resolve a member by name; "me"/"I"/"myself" means the signed-in user's member entry. */
 export function matchMember(members, query, myUid) {
-  if (["me", "i", "myself"].includes(query.trim().toLowerCase())) {
+  const q = query.trim().toLowerCase();
+  // A member literally named "Me" wins over the alias.
+  if (["me", "i", "myself"].includes(q) && !members.some((m) => m.name.toLowerCase() === q)) {
     const me = members.find((m) => m.uid === myUid);
     if (me) return me;
   }
@@ -306,11 +308,33 @@ async function findGroup(query) {
 }
 
 async function groupDocs(groupId, sub) {
-  const { documents = [] } = await api(`${DOCS}/groups/${groupId}/${sub}?pageSize=300`);
-  return documents.map((d) => ({ id: d.name.split("/").pop(), ...fromFields(d.fields) }));
+  const docs = [];
+  let pageToken = "";
+  do {
+    const page = await api(`${DOCS}/groups/${groupId}/${sub}?pageSize=300${pageToken && `&pageToken=${encodeURIComponent(pageToken)}`}`);
+    docs.push(...(page.documents ?? []));
+    pageToken = page.nextPageToken ?? "";
+  } while (pageToken);
+  return docs.map((d) => ({ id: d.name.split("/").pop(), ...fromFields(d.fields) }));
 }
 
 const newMemberId = () => randomBytes(4).toString("hex");
+/** Firestore-style 20-char id, so related docs can be written in one atomic commit. */
+const newDocId = () => Array.from(randomBytes(20), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[b % 62]).join("");
+const DB_PATH = DOCS.replace("https://firestore.googleapis.com/v1/", "");
+
+/** Atomically create several documents ({path relative to documents/, fields}). */
+async function createAll(docs) {
+  await api(`${DOCS}:commit`, {
+    method: "POST",
+    body: JSON.stringify({
+      writes: docs.map(({ path, fields }) => ({
+        update: { name: `${DB_PATH}/${path}`, fields: toFields(fields) },
+        currentDocument: { exists: false },
+      })),
+    }),
+  });
+}
 
 async function split(args, opts) {
   const [sub, ...rest] = args;
@@ -353,28 +377,29 @@ async function split(args, opts) {
     const shares = computeShares(amount, "equal", [...new Set(participants)]);
     const date = parseDate(opts.date);
     const me = group.members.find((m) => m.uid === uid);
+    const writes = [];
     let personalExpenseId;
     if (group.autoAddShare && group.currency === "INR" && me && shares[me.id]) {
-      const base = await userBase();
-      const categories = await getCategories(base);
+      const categories = await getCategories(await userBase());
       const category = categories.find((c) => c.name === "Travel") ?? categories.find((c) => c.name === "Other") ?? categories[0];
-      const personal = await api(`${base}/expenses`, {
-        method: "POST",
-        body: JSON.stringify({
-          fields: toFields({
-            title: `${group.name}: ${title}`, merchant: "", amount: shares[me.id], currency: "INR",
-            categoryId: category?.id ?? "", paymentMethod: "Other", notes: `Your share, split in ${group.name}`,
-            expenseDate: date, createdAt: new Date(),
-          }),
-        }),
+      personalExpenseId = newDocId();
+      writes.push({
+        path: `users/${uid}/expenses/${personalExpenseId}`,
+        fields: {
+          title: `${group.name}: ${title}`, merchant: "", amount: shares[me.id], currency: "INR",
+          categoryId: category?.id ?? "", paymentMethod: "Other", notes: `Your share, split in ${group.name}`,
+          expenseDate: date, createdAt: new Date(),
+        },
       });
-      personalExpenseId = personal.name.split("/").pop();
     }
-    const fields = {
-      title, amount, paidBy: paidBy.id, splitMode: "equal", shares, date, createdBy: uid, createdAt: new Date(),
-      ...(personalExpenseId && { personalExpenseId }),
-    };
-    await api(`${DOCS}/groups/${group.id}/expenses`, { method: "POST", body: JSON.stringify({ fields: toFields(fields) }) });
+    writes.push({
+      path: `groups/${group.id}/expenses/${newDocId()}`,
+      fields: {
+        title, amount, paidBy: paidBy.id, splitMode: "equal", shares, date, createdBy: uid, createdAt: new Date(),
+        ...(personalExpenseId && { personalExpenseId }),
+      },
+    });
+    await createAll(writes); // both or neither: no orphaned personal share if the group write fails
     const each = Object.entries(shares).map(([id, v]) => `${name(id)} ${money(v)}`).join(", ");
     return console.log(`Added ${money(amount)} · ${title} to ${group.name}: paid by ${paidBy.name}; shares ${each}${personalExpenseId ? " (your share also added to Expenses)" : ""}`);
   }
@@ -395,6 +420,7 @@ async function split(args, opts) {
     if (!opts.from || !opts.to) throw new Error("Usage: ridv split settle -g <group> --from A --to B [amount]");
     const from = matchMember(group.members, opts.from, uid);
     const to = matchMember(group.members, opts.to, uid);
+    if (from.id === to.id) throw new Error(`--from and --to are both ${from.name}.`);
     let amount = rest[0] ? parseAmount(rest[0]) : undefined;
     if (amount === undefined) {
       const [expenses, settlements] = await Promise.all([groupDocs(group.id, "expenses"), groupDocs(group.id, "settlements")]);

@@ -9,6 +9,12 @@ export type Transfer = { from: string; to: string; amount: number };
 
 const toMinor = (n: number) => Math.round(n * 100);
 const fromMinor = (n: number) => n / 100;
+const MAX_AMOUNT = 1e9; // sanity cap: keeps paise maths far inside safe-integer range
+
+/** "₹1,200.50" / "1200.5" -> 1200.5 (rounded to 2 dp); NaN if it isn't a number. */
+export function parseMoney(text: string) {
+  return fromMinor(toMinor(Number(String(text).replace(/[₹$€£,\s]/g, ""))));
+}
 
 /**
  * Turn an amount + split mode into absolute shares per member.
@@ -21,9 +27,15 @@ export function computeShares(
   participants: string[],
   inputs: Record<string, number> = {},
 ): Record<string, number> {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be a number greater than zero.");
+  if (amount > MAX_AMOUNT) throw new Error("That amount is too large.");
   const total = toMinor(amount);
-  if (!(total > 0)) throw new Error("Amount must be greater than zero.");
+  if (total <= 0) throw new Error("Amount must be at least 0.01.");
   if (!participants.length) throw new Error("Pick at least one person to split with.");
+  if (mode !== "equal") {
+    const bad = participants.find((id) => !Number.isFinite(inputs[id] ?? 0) || (inputs[id] ?? 0) < 0);
+    if (bad !== undefined) throw new Error("Every share must be a number of 0 or more.");
+  }
 
   let minor: number[];
   if (mode === "equal") {
@@ -32,16 +44,26 @@ export function computeShares(
   } else if (mode === "exact") {
     minor = participants.map((id) => toMinor(inputs[id] ?? 0));
     const sum = minor.reduce((a, b) => a + b, 0);
-    if (sum !== total) throw new Error(`Exact amounts add up to ${fromMinor(sum)}, not ${amount}.`);
+    if (sum !== total) throw new Error(`Exact amounts add up to ${fromMinor(sum)}, not ${fromMinor(total)}.`);
   } else {
     const pct = participants.map((id) => inputs[id] ?? 0);
     const pctSum = pct.reduce((a, b) => a + b, 0);
-    if (Math.abs(pctSum - 100) > 0.001) throw new Error(`Percentages add up to ${pctSum}%, not 100%.`);
+    // Tight tolerance: only float noise (33.333+33.333+33.334), never a real over/under-allocation.
+    if (!(Math.abs(pctSum - 100) <= 1e-9)) throw new Error(`Percentages add up to ${pctSum}%, not 100%.`);
     minor = pct.map((p) => Math.floor((total * p) / 100));
     let left = total - minor.reduce((a, b) => a + b, 0);
-    for (let i = 0; left > 0; i = (i + 1) % minor.length, left--) minor[i] += 1;
+    // Remainder paise go to participants who actually have a share.
+    for (let i = 0; left > 0; i = (i + 1) % minor.length) {
+      if (pct[i] > 0) {
+        minor[i] += 1;
+        left--;
+      }
+    }
   }
-  if (minor.some((m) => m < 0)) throw new Error("Shares can't be negative.");
+  // Invariant for every mode: shares are non-negative and add up to the total exactly.
+  if (minor.some((m) => m < 0) || minor.reduce((a, b) => a + b, 0) !== total) {
+    throw new Error("Shares don't add up to the amount.");
+  }
   return Object.fromEntries(participants.map((id, i) => [id, fromMinor(minor[i])]).filter(([, v]) => v !== 0));
 }
 

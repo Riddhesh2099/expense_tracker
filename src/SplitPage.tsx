@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -18,7 +20,7 @@ import type { User } from "firebase/auth";
 import { ArrowRightLeft, Check, Plus, Trash2, Users } from "lucide-react";
 import { db } from "./firebase";
 import { formatInputDate } from "./lib";
-import { balances, computeShares, CURRENCIES, formatCurrency, simplify, type Member, type SplitMode } from "./split";
+import { balances, computeShares, CURRENCIES, formatCurrency, parseMoney, simplify, type Member, type SplitMode } from "./split";
 import type { Category } from "./types";
 
 type Group = {
@@ -58,12 +60,15 @@ function GroupList({ user }: { user: User }) {
 
   useEffect(() => {
     if (!db) return;
-    return onSnapshot(query(collection(db, "groups"), where("memberUids", "array-contains", user.uid)), (snap) =>
-      setGroups(
-        snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<Group, "id">) }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
+    return onSnapshot(
+      query(collection(db, "groups"), where("memberUids", "array-contains", user.uid)),
+      (snap) =>
+        setGroups(
+          snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<Group, "id">) }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        ),
+      (err) => setError(`Couldn't load your groups: ${err.message}`),
     );
   }, [user.uid]);
 
@@ -142,6 +147,7 @@ function GroupView({ user, groupId, categories }: { user: User; groupId: string;
   const [expenses, setExpenses] = useState<SplitExpense[]>([]);
   const [settlements, setSettlements] = useState<SplitSettlement[]>([]);
   const [error, setError] = useState("");
+  const [settling, setSettling] = useState(false);
 
   useEffect(() => {
     if (!db) return;
@@ -153,11 +159,15 @@ function GroupView({ user, groupId, categories }: { user: User; groupId: string;
         (snap) => setGroup(snap.exists() ? ({ id: snap.id, ...snap.data() } as Group) : null),
         () => setGroup(null),
       ),
-      onSnapshot(query(collection(ref, "expenses"), orderBy("date", "desc")), (snap) =>
-        setExpenses(snap.docs.map((d) => ({ id: d.id, ...d.data(), date: toDate(d.data().date) }) as SplitExpense)),
+      onSnapshot(
+        query(collection(ref, "expenses"), orderBy("date", "desc")),
+        (snap) => setExpenses(snap.docs.map((d) => ({ id: d.id, ...d.data(), date: toDate(d.data().date) }) as SplitExpense)),
+        (err) => setError(`Couldn't load expenses: ${err.message}`),
       ),
-      onSnapshot(query(collection(ref, "settlements"), orderBy("date", "desc")), (snap) =>
-        setSettlements(snap.docs.map((d) => ({ id: d.id, ...d.data(), date: toDate(d.data().date) }) as SplitSettlement)),
+      onSnapshot(
+        query(collection(ref, "settlements"), orderBy("date", "desc")),
+        (snap) => setSettlements(snap.docs.map((d) => ({ id: d.id, ...d.data(), date: toDate(d.data().date) }) as SplitSettlement)),
+        (err) => setError(`Couldn't load settlements: ${err.message}`),
       ),
     ];
     return () => unsubs.forEach((u) => u());
@@ -197,7 +207,8 @@ function GroupView({ user, groupId, categories }: { user: User; groupId: string;
     const memberName = input.value.trim();
     if (!memberName) return;
     input.value = "";
-    run(() => updateDoc(ref, { members: [...g.members, { id: newId(), name: memberName }] }), "Could not add the member.");
+    // arrayUnion/arrayRemove: concurrent edits from two tabs don't overwrite each other.
+    run(() => updateDoc(ref, { members: arrayUnion({ id: newId(), name: memberName }) }), "Could not add the member.");
   }
 
   function removeMember(member: Member) {
@@ -205,15 +216,24 @@ function GroupView({ user, groupId, categories }: { user: User; groupId: string;
       setError(`${member.name} has expenses or a balance in this group, so they can't be removed.`);
       return;
     }
-    run(() => updateDoc(ref, { members: g.members.filter((m) => m.id !== member.id) }), "Could not remove the member.");
+    run(() => updateDoc(ref, { members: arrayRemove(member) }), "Could not remove the member.");
   }
 
-  function settle(from: string, to: string, amount: number) {
-    if (!window.confirm(`Record that ${name(from)} paid ${name(to)} ${money(amount)}?`)) return;
-    run(
-      () => addDoc(collection(ref, "settlements"), { from, to, amount, date: Timestamp.fromDate(new Date()), createdBy: user.uid }),
+  async function settle(from: string, to: string, amount: number) {
+    if (settling || !window.confirm(`Record that ${name(from)} paid ${name(to)} ${money(amount)}?`)) return;
+    setSettling(true);
+    await run(
+      () =>
+        addDoc(collection(ref, "settlements"), {
+          from,
+          to,
+          amount,
+          date: Timestamp.fromDate(new Date(`${formatInputDate(new Date())}T12:00:00`)),
+          createdBy: user.uid,
+        }),
       "Could not record the settlement.",
     );
+    setSettling(false);
   }
 
   async function removeExpense(expense: SplitExpense) {
@@ -277,7 +297,7 @@ function GroupView({ user, groupId, categories }: { user: User; groupId: string;
                     <strong>{name(t.from)}</strong> pays <strong>{name(t.to)}</strong>
                   </span>
                   <strong>{money(t.amount)}</strong>
-                  <button className="ghost" onClick={() => settle(t.from, t.to, t.amount)}>
+                  <button className="ghost" onClick={() => settle(t.from, t.to, t.amount)} disabled={settling}>
                     Settle
                   </button>
                 </div>
@@ -406,7 +426,9 @@ function SplitExpenseForm({
 }) {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
-  const [paidBy, setPaidBy] = useState(me?.id ?? group.members[0]?.id ?? "");
+  const [pickedPaidBy, setPaidBy] = useState(me?.id ?? group.members[0]?.id ?? "");
+  // Derived: if the picked payer was removed meanwhile, fall back to what the select shows.
+  const paidBy = group.members.some((m) => m.id === pickedPaidBy) ? pickedPaidBy : (group.members[0]?.id ?? "");
   const [mode, setMode] = useState<SplitMode>("equal");
   // Track who's left OUT, so members added later are automatically in the split.
   const [excluded, setExcluded] = useState<string[]>([]);
@@ -420,13 +442,14 @@ function SplitExpenseForm({
     event.preventDefault();
     if (!db) return;
     onError("");
+    const total = parseMoney(amount); // "₹1,200.456" -> 1200.46: stored amount == what the shares add up to
     let shares: Record<string, number>;
     try {
       shares = computeShares(
-        Number(amount),
+        total,
         mode,
         participants,
-        Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, Number(v || 0)])),
+        Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, v.trim() === "" ? 0 : parseMoney(v)])),
       );
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : "Invalid split.");
@@ -435,11 +458,16 @@ function SplitExpenseForm({
     setBusy(true);
     const when = Timestamp.fromDate(new Date(`${date}T12:00:00`));
     try {
-      let personalExpenseId: string | undefined;
+      // One atomic batch: the group expense and (optionally) your personal share land together or not at all.
+      const batch = writeBatch(db);
+      const groupExpense = doc(collection(db, "groups", group.id, "expenses"));
       const myShare = me ? shares[me.id] : undefined;
+      let personalExpenseId: string | undefined;
       if (group.autoAddShare && group.currency === "INR" && myShare) {
         const category = categories.find((c) => c.name === "Travel") ?? categories.find((c) => c.name === "Other") ?? categories[0];
-        const personal = await addDoc(collection(db, "users", user.uid, "expenses"), {
+        const personal = doc(collection(db, "users", user.uid, "expenses"));
+        personalExpenseId = personal.id;
+        batch.set(personal, {
           title: `${group.name}: ${title}`,
           merchant: "",
           amount: myShare,
@@ -450,11 +478,10 @@ function SplitExpenseForm({
           expenseDate: when,
           createdAt: serverTimestamp(),
         });
-        personalExpenseId = personal.id;
       }
-      await addDoc(collection(db, "groups", group.id, "expenses"), {
+      batch.set(groupExpense, {
         title,
-        amount: Number(amount),
+        amount: total,
         paidBy,
         splitMode: mode,
         shares,
@@ -463,6 +490,7 @@ function SplitExpenseForm({
         createdAt: serverTimestamp(),
         ...(personalExpenseId && { personalExpenseId }),
       });
+      await batch.commit();
       setTitle("");
       setAmount("");
       setInputs({});
