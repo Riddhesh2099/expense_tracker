@@ -1,6 +1,69 @@
+/* Theme tokens. Light by default; dark follows the OS unless the toggle forced a theme (data-theme on <html>). */
 :root {
-  color: #172033;
-  background: #eef2f7;
+  color-scheme: light;
+  --bg: #eef2f7;
+  --text: #172033;
+  --muted: #64748b;
+  --surface: #ffffff;
+  --panel: rgba(255, 255, 255, 0.92);
+  --row: #f8fafc;
+  --line: #e2e8f0;
+  --border: #d9e2ef;
+  --border-strong: #cbd5e1;
+  --primary: #0f172a;
+  --on-primary: #ffffff;
+  --toolbar: #172033;
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --shadow: rgba(15, 23, 42, 0.08);
+  --shadow-strong: rgba(15, 23, 42, 0.16);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --surface: #111827;
+  --panel: rgba(17, 24, 39, 0.92);
+  --row: #0f172a;
+  --line: #1e293b;
+  --border: #1f2a3d;
+  --border-strong: #334155;
+  --primary: #2563eb;
+  --on-primary: #ffffff;
+  --toolbar: #111827;
+  --accent: #60a5fa;
+  --danger: #f87171;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b1120;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --surface: #111827;
+    --panel: rgba(17, 24, 39, 0.92);
+    --row: #0f172a;
+    --line: #1e293b;
+    --border: #1f2a3d;
+    --border-strong: #334155;
+    --primary: #2563eb;
+    --on-primary: #ffffff;
+    --toolbar: #111827;
+    --accent: #60a5fa;
+    --danger: #f87171;
+    --shadow: rgba(0, 0, 0, 0.35);
+    --shadow-strong: rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root {
+  color: var(--text);
+  background: var(--bg);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
@@ -25,10 +88,10 @@ textarea {
 
 button {
   align-items: center;
-  background: #0f172a;
+  background: var(--primary);
   border: 0;
   border-radius: 8px;
-  color: white;
+  color: var(--on-primary);
   cursor: pointer;
   display: inline-flex;
   font-weight: 700;
@@ -46,10 +109,10 @@ button:disabled {
 input,
 select,
 textarea {
-  background: white;
-  border: 1px solid #cbd5e1;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  color: #172033;
+  color: var(--text);
   min-height: 44px;
   padding: 10px 12px;
   width: 100%;
@@ -81,7 +144,7 @@ textarea {
 }
 
 .eyebrow {
-  color: #2563eb;
+  color: var(--accent);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -108,8 +171,13 @@ h2 {
 
 .ghost,
 .link-button {
-  background: white;
-  color: #0f172a;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
 }
 
 a.eyebrow {
@@ -118,7 +186,7 @@ a.eyebrow {
 }
 
 .hub-intro {
-  color: #64748b;
+  color: var(--muted);
 }
 
 .hub-grid {
@@ -136,11 +204,11 @@ a.eyebrow {
 }
 
 a.hub-card:hover {
-  border-color: #2563eb;
+  border-color: var(--accent);
 }
 
 .hub-card p {
-  color: #64748b;
+  color: var(--muted);
   margin: 0;
 }
 
@@ -149,7 +217,7 @@ a.hub-card:hover {
 }
 
 .soon {
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -164,17 +232,17 @@ a.link-button {
 }
 
 .google-button {
-  background: white;
-  border: 1px solid #cbd5e1;
-  color: #172033;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
 }
 
 .google-button span {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  color: #2563eb;
+  color: var(--accent);
   display: inline-flex;
   font-weight: 900;
   height: 24px;
@@ -184,7 +252,7 @@ a.link-button {
 
 .divider {
   align-items: center;
-  color: #64748b;
+  color: var(--muted);
   display: grid;
   font-size: 0.82rem;
   gap: 10px;
@@ -193,7 +261,7 @@ a.link-button {
 
 .divider::before,
 .divider::after {
-  background: #e2e8f0;
+  background: var(--line);
   content: "";
   height: 1px;
 }
@@ -222,10 +290,10 @@ a.link-button {
 
 .panel,
 .metric {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #d9e2ef;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 40px var(--shadow);
 }
 
 .metric {
@@ -235,11 +303,11 @@ a.link-button {
 }
 
 .metric svg {
-  color: #2563eb;
+  color: var(--accent);
 }
 
 .metric span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 
@@ -331,18 +399,18 @@ a.link-button {
 }
 
 .budget-row > span:last-child {
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.9rem;
   white-space: nowrap;
 }
 
 .budget-row .over {
-  color: #dc2626;
+  color: var(--danger);
   font-weight: 700;
 }
 
 .budget-bar {
-  background: #e2e8f0;
+  background: var(--line);
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
@@ -355,7 +423,7 @@ a.link-button {
 
 .category-pill {
   align-items: center;
-  border: 1px solid #d9e2ef;
+  border: 1px solid var(--border);
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.84rem;
@@ -364,7 +432,7 @@ a.link-button {
 }
 
 .toolbar {
-  background: #172033;
+  background: var(--toolbar);
   border-radius: 8px;
   display: grid;
   gap: 10px;
@@ -380,7 +448,7 @@ a.link-button {
 }
 
 .search-field svg {
-  color: #64748b;
+  color: var(--muted);
   left: 12px;
   position: absolute;
 }
@@ -403,8 +471,8 @@ a.link-button {
 }
 
 .expense-row {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--row);
+  border: 1px solid var(--line);
   border-radius: 8px;
   gap: 12px;
   grid-template-columns: minmax(180px, 1fr) 170px auto auto 44px;
@@ -416,7 +484,7 @@ a.link-button {
 }
 
 .expense-row span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.86rem;
 }
 
@@ -432,7 +500,7 @@ a.link-button {
 
 .empty {
   align-items: center;
-  color: #64748b;
+  color: var(--muted);
   display: flex;
   justify-content: center;
   min-height: 190px;
@@ -449,10 +517,10 @@ a.link-button {
 }
 
 .auth-panel {
-  background: white;
-  border: 1px solid #d9e2ef;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 20px 60px var(--shadow-strong);
   display: grid;
   gap: 12px;
   max-width: 420px;
@@ -465,19 +533,19 @@ a.link-button {
 }
 
 .auth-panel p {
-  color: #64748b;
+  color: var(--muted);
 }
 
 .auth-panel pre {
-  background: #0f172a;
+  background: var(--primary);
   border-radius: 8px;
-  color: white;
+  color: var(--on-primary);
   overflow: auto;
   padding: 14px;
 }
 
 .error {
-  color: #b91c1c;
+  color: var(--danger);
   font-size: 0.9rem;
 }
 
